@@ -59,3 +59,24 @@ Manchester, UK
 - **Cold email**: follow CAN-SPAM (US): real name and address, clear opt-out. In the UK/EU, GDPR applies to business emails too.
 - Google's Places terms limit long-term storage of Places data. Use the sheet as a working outreach list, not a resold database.
 - Emails are only found if they appear on the homepage. Many sites list them on `/contact` instead.
+
+---
+
+## Free option: Apify version (`hvac-lead-scraper-apify.json`)
+
+Same workflow, but it uses Apify's Google Maps Scraper instead of the Google API. No credit card and no Google Cloud setup.
+
+1. Sign up at <https://apify.com>. The free plan gives **$5 of credit every month** (roughly 1,000–3,000 businesses; adding emails or reviews inside Apify uses credit faster, so this workflow finds emails itself).
+2. Apify Console → *Settings → API & Integrations* → copy your **API token**.
+3. In n8n, import `hvac-lead-scraper-apify.json` and create a **Query Auth** credential for the *Apify Google Maps Scraper* node:
+   - Name: `token`
+   - Value: your Apify API token
+4. Set up the Google Sheet as above (an extra `category` column is added automatically).
+5. In the form, set *Max results per location* (default 50, up to 500). Unlike the Google API, this is not capped at 60.
+
+Each location can take 1–4 minutes. Keep locations per run small (5–10) so a run doesn't hit n8n's time limit.
+
+## Other free options (manual, no n8n)
+
+- **Instant Data Scraper** (free Chrome extension): open Google Maps, search "HVAC in Dallas", scroll, export CSV.
+- **Outscraper**: first 500 records/month free, upload the CSV to your sheet.

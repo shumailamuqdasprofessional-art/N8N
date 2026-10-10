@@ -1,0 +1,262 @@
+{
+  "name": "HVAC Lead Scraper (Apify free plan)",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Lead Search Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "hvac-lead-search-apify",
+      "parameters": {
+        "formTitle": "HVAC Lead Search",
+        "formDescription": "One location per line. Apify free plan = $5 credit/month (roughly 1,000–3,000 businesses).",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Locations",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Austin, Texas\nDallas, Texas\nToronto, Canada\nManchester, UK"
+            },
+            {
+              "fieldLabel": "Search term",
+              "placeholder": "HVAC contractor"
+            },
+            {
+              "fieldLabel": "Max results per location",
+              "fieldType": "number",
+              "placeholder": "50"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a2",
+      "name": "Build Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// One Apify search per location. Separate locations with new lines or \";\".\nconst form = $input.first().json;\nconst term = String(form['Search term'] || 'HVAC contractor').trim();\nconst max = Math.min(Math.max(parseInt(form['Max results per location'], 10) || 50, 1), 500);\nconst locations = String(form['Locations'] || '')\n  .split(/[\\n;]+/)\n  .map((s) => s.trim())\n  .filter(Boolean);\n\nreturn [...new Set(locations)].map((location) => ({\n  json: {\n    location,\n    apifyInput: {\n      searchStringsArray: [term],\n      locationQuery: location,\n      maxCrawledPlacesPerSearch: max,\n      language: 'en',\n      skipClosedPlaces: true,\n    },\n  },\n}));"
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Apify Google Maps Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.apifyInput) }}",
+        "options": {
+          "timeout": 300000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "",
+          "name": "Apify API Token"
+        }
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Clean + Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Apify returns one item per business. Remove duplicates/closed places and score.\nconst seen = new Set();\nconst out = [];\n\nfor (const item of $input.all()) {\n  const p = item.json;\n  const id = p.placeId || p.url || p.title;\n  if (!p.title || !id || seen.has(id)) continue;\n  if (p.permanentlyClosed || p.temporarilyClosed) continue;\n  seen.add(id);\n\n  const phone = p.phone || p.phoneUnformatted || '';\n  const reviews = Number(p.reviewsCount) || 0;\n  const rating = Number(p.totalScore) || 0;\n  const reasons = [];\n  let score = 0;\n\n  if (phone) { score += 30; reasons.push('has phone'); }\n  if (reviews >= 5 && reviews <= 150) { score += 30; reasons.push('small/medium shop'); }\n  else if (reviews > 150 && reviews <= 400) { score += 10; reasons.push('mid-size shop'); }\n  else if (reviews > 400) { reasons.push('large company (likely has call center)'); }\n  else { reasons.push('very few reviews'); }\n  if (p.website) { score += 20; reasons.push('has website'); }\n  if (rating && rating < 4.3) { score += 10; reasons.push('rating could improve'); }\n\n  out.push({\n    json: {\n      place_id: id,\n      business_name: p.title,\n      phone,\n      international_phone: p.phoneUnformatted || '',\n      website: p.website || '',\n      address: p.address || '',\n      search_location: p.searchString ? [p.city, p.state, p.countryCode].filter(Boolean).join(', ') : '',\n      category: p.categoryName || '',\n      rating,\n      reviews,\n      google_maps_url: p.url || '',\n      lead_score: score,\n      score_reasons: reasons.join(', '),\n    },\n  });\n}\n\nreturn out;"
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Fetch Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ $json.website || 'https://invalid.invalid' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a6",
+      "name": "Find Emails + Booking Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Reads each website's HTML: finds emails and checks whether the business\n// already has online booking or a chat widget (if not, they need you more).\nconst leads = $('Clean + Score').all();\nconst pages = $input.all();\n\nconst BOOKING = /servicetitan|housecallpro|housecall pro|jobber|scheduleengine|book online|schedule online|book now/i;\nconst CHAT = /podium|birdeye|tawk\\.to|livechat|intercom|drift\\.com|hs-scripts|smith\\.ai|ruby\\.com/i;\nconst JUNK = /\\.(png|jpe?g|gif|svg|webp)$|example\\.|sentry|wixpress|domain\\.com|yourname|email\\.com/i;\n\nreturn leads.map((lead, i) => {\n  const page = pages[i] ? pages[i].json : {};\n  const html = typeof page.data === 'string' ? page.data : '';\n  const l = { ...lead.json };\n\n  const emails = [...new Set(\n    (html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [])\n      .map((e) => e.toLowerCase())\n      .filter((e) => !JUNK.test(e))\n  )];\n\n  l.email = emails[0] || '';\n  l.all_emails = emails.slice(0, 5).join(', ');\n  l.website_checked = html.length > 0;\n  l.has_online_booking = html ? BOOKING.test(html) : '';\n  l.has_chat_widget = html ? CHAT.test(html) : '';\n\n  const reasons = l.score_reasons ? [l.score_reasons] : [];\n  if (l.email) { l.lead_score += 10; reasons.push('email found'); }\n  if (html && !l.has_online_booking && !l.has_chat_widget) {\n    l.lead_score += 10;\n    reasons.push('no online booking or chat');\n  }\n  l.score_reasons = reasons.join(', ');\n  l.lead_status = l.lead_score >= 70 ? 'HOT' : l.lead_score >= 40 ? 'WARM' : 'COLD';\n  l.scraped_at = new Date().toISOString();\n  return { json: l };\n});"
+      }
+    },
+    {
+      "id": "a7",
+      "name": "Save to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "place_id"
+          ],
+          "schema": []
+        },
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Lead Search Form": {
+      "main": [
+        [
+          {
+            "node": "Build Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Queries": {
+      "main": [
+        [
+          {
+            "node": "Apify Google Maps Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean + Score": {
+      "main": [
+        [
+          {
+            "node": "Fetch Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Website": {
+      "main": [
+        [
+          {
+            "node": "Find Emails + Booking Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Emails + Booking Check": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify Google Maps Scraper": {
+      "main": [
+        [
+          {
+            "node": "Clean + Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
