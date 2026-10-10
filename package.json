@@ -1,0 +1,25 @@
+{
+  "name": "meta-n8n-webhook-relay",
+  "version": "1.0.0",
+  "description": "Receives Meta (WhatsApp, Instagram, Messenger) webhooks, verifies them, and forwards them to n8n.",
+  "main": "app.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "test": "NODE_ENV=test jest"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "supertest": "^7.3.1"
+  }
+}

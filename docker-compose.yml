@@ -1,0 +1,28 @@
+# Runs the webhook relay together with a local n8n instance.
+#   cp .env.example .env   # then edit it
+#   docker compose up -d
+services:
+  relay:
+    build: .
+    env_file: .env
+    environment:
+      # Inside Docker, reach n8n by its service name. Override in .env if needed.
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/meta}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - n8n
+    restart: unless-stopped
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  n8n_data:
