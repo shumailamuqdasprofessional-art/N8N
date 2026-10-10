@@ -1,0 +1,293 @@
+{
+  "name": "HVAC Lead Scraper (Google Places)",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Lead Search Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "hvac-lead-search",
+      "parameters": {
+        "formTitle": "HVAC Lead Search",
+        "formDescription": "One location per line. Use cities for best coverage (Google returns max 60 results per search).",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Locations",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "Austin, Texas\nDallas, Texas\nToronto, Canada\nManchester, UK"
+            },
+            {
+              "fieldLabel": "Search term",
+              "placeholder": "HVAC contractor"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a2",
+      "name": "Build Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// One search per location. Separate locations with new lines or \";\"\n// (commas are allowed inside a location, e.g. \"Austin, Texas\").\nconst form = $input.first().json;\nconst term = String(form['Search term'] || 'HVAC contractor').trim();\nconst locations = String(form['Locations'] || '')\n  .split(/[\\n;]+/)\n  .map((s) => s.trim())\n  .filter(Boolean);\n\nreturn [...new Set(locations)].map((location) => ({\n  json: { location, query: `${term} in ${location}` },\n}));"
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Google Places Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.businessStatus,places.googleMapsUri,nextPageToken"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "textQuery",
+              "value": "={{ $json.query }}"
+            },
+            {
+              "name": "pageSize",
+              "value": "20"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.nextPageToken }}",
+              "limitPagesFetched": true,
+              "maxRequests": 3,
+              "requestInterval": 2000
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Google Places API Key"
+        }
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Clean + Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Flattens all result pages, removes duplicates and closed businesses,\n// and scores each lead for an AI receptionist / missed-call offer.\nconst items = $input.all();\nconst seen = new Set();\nconst out = [];\n\nfor (let i = 0; i < items.length; i++) {\n  let location = '';\n  try {\n    location = $('Build Queries').itemMatching(i).json.location;\n  } catch (e) {}\n\n  for (const p of items[i].json.places || []) {\n    if (!p.id || seen.has(p.id)) continue;\n    if (p.businessStatus && p.businessStatus !== 'OPERATIONAL') continue;\n    seen.add(p.id);\n\n    const phone = p.nationalPhoneNumber || p.internationalPhoneNumber || '';\n    const reviews = Number(p.userRatingCount) || 0;\n    const rating = Number(p.rating) || 0;\n    const reasons = [];\n    let score = 0;\n\n    if (phone) { score += 30; reasons.push('has phone'); }\n    if (reviews >= 5 && reviews <= 150) { score += 30; reasons.push('small/medium shop'); }\n    else if (reviews > 150 && reviews <= 400) { score += 10; reasons.push('mid-size shop'); }\n    else if (reviews > 400) { reasons.push('large company (likely has call center)'); }\n    else { reasons.push('very few reviews'); }\n    if (p.websiteUri) { score += 20; reasons.push('has website'); }\n    if (rating && rating < 4.3) { score += 10; reasons.push('rating could improve'); }\n\n    out.push({\n      json: {\n        place_id: p.id,\n        business_name: (p.displayName && p.displayName.text) || '',\n        phone,\n        international_phone: p.internationalPhoneNumber || '',\n        website: p.websiteUri || '',\n        address: p.formattedAddress || '',\n        search_location: location,\n        rating,\n        reviews,\n        google_maps_url: p.googleMapsUri || '',\n        lead_score: score,\n        score_reasons: reasons.join(', '),\n      },\n    });\n  }\n}\n\nreturn out;"
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Fetch Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ $json.website || 'https://invalid.invalid' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a6",
+      "name": "Find Emails + Booking Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Reads each website's HTML: finds emails and checks whether the business\n// already has online booking or a chat widget (if not, they need you more).\nconst leads = $('Clean + Score').all();\nconst pages = $input.all();\n\nconst BOOKING = /servicetitan|housecallpro|housecall pro|jobber|scheduleengine|book online|schedule online|book now/i;\nconst CHAT = /podium|birdeye|tawk\\.to|livechat|intercom|drift\\.com|hs-scripts|smith\\.ai|ruby\\.com/i;\nconst JUNK = /\\.(png|jpe?g|gif|svg|webp)$|example\\.|sentry|wixpress|domain\\.com|yourname|email\\.com/i;\n\nreturn leads.map((lead, i) => {\n  const page = pages[i] ? pages[i].json : {};\n  const html = typeof page.data === 'string' ? page.data : '';\n  const l = { ...lead.json };\n\n  const emails = [...new Set(\n    (html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [])\n      .map((e) => e.toLowerCase())\n      .filter((e) => !JUNK.test(e))\n  )];\n\n  l.email = emails[0] || '';\n  l.all_emails = emails.slice(0, 5).join(', ');\n  l.website_checked = html.length > 0;\n  l.has_online_booking = html ? BOOKING.test(html) : '';\n  l.has_chat_widget = html ? CHAT.test(html) : '';\n\n  const reasons = l.score_reasons ? [l.score_reasons] : [];\n  if (l.email) { l.lead_score += 10; reasons.push('email found'); }\n  if (html && !l.has_online_booking && !l.has_chat_widget) {\n    l.lead_score += 10;\n    reasons.push('no online booking or chat');\n  }\n  l.score_reasons = reasons.join(', ');\n  l.lead_status = l.lead_score >= 70 ? 'HOT' : l.lead_score >= 40 ? 'WARM' : 'COLD';\n  l.scraped_at = new Date().toISOString();\n  return { json: l };\n});"
+      }
+    },
+    {
+      "id": "a7",
+      "name": "Save to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "place_id"
+          ],
+          "schema": []
+        },
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Lead Search Form": {
+      "main": [
+        [
+          {
+            "node": "Build Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Queries": {
+      "main": [
+        [
+          {
+            "node": "Google Places Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Places Search": {
+      "main": [
+        [
+          {
+            "node": "Clean + Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean + Score": {
+      "main": [
+        [
+          {
+            "node": "Fetch Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Website": {
+      "main": [
+        [
+          {
+            "node": "Find Emails + Booking Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Emails + Booking Check": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
