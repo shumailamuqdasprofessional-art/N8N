@@ -1,0 +1,493 @@
+{
+  "name": "HVAC Cold Email Sequence",
+  "nodes": [
+    {
+      "id": "e1",
+      "name": "Every Weekday 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e2",
+      "name": "Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// ===== EDIT THESE BEFORE ACTIVATING =====\nreturn [{\n  json: {\n    yourName: 'YOUR NAME',\n    yourPhone: 'YOUR PHONE',\n    yourAddress: 'YOUR BUSINESS POSTAL ADDRESS', // required by CAN-SPAM\n    dailyLimit: 25,                              // keep 20-30 per inbox per day\n    leadStatuses: ['HOT', 'WARM'],               // which leads get emails\n    followUpDays: [2, 4, 7],                     // gap after email 1, 2, 3\n  },\n}];"
+      }
+    },
+    {
+      "id": "e3",
+      "name": "Read Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": false,
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "e4",
+      "name": "Pick Today's Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Picks which leads get an email today and writes the message.\nconst s = $('Settings').first().json;\nif ([s.yourName, s.yourPhone, s.yourAddress].some((v) => /^YOUR /.test(String(v)))) {\n  throw new Error('Open the Settings node and fill in your name, phone and postal address first.');\n}\nconst rows = $input.all().map((i) => i.json);\nconst now = Date.now();\nconst today = new Date().toISOString().slice(0, 10);\nconst DAY = 24 * 60 * 60 * 1000;\nconst STOP = ['replied', 'opted_out', 'finished', 'bounced'];\nconst allowed = s.leadStatuses.map((x) => x.toUpperCase());\n\nconst TEMPLATES = [\n  {\n    subject: (c) => `missed calls at ${c.company}`,\n    body: (c) => `Hi ${c.company} team,\n\nQuick question: when you're on a job in ${c.city} and the phone rings, who picks up?\n\nFor most HVAC shops I talk to, the answer is \"voicemail\", and that customer calls the next company on Google.\n\nI set up a simple system: every missed call gets an instant text from your business, the customer's problem and address get collected, and the job gets booked. Emergencies go straight to you.\n\nWorth a 10-minute demo? You can text it like a real customer.`,\n  },\n  {\n    subject: (c) => `re: missed calls at ${c.company}`,\n    body: (c) => `Hi ${c.company} team,\n\nA quick number to think about: if you miss just 5 calls a week and 1 in 3 would have booked, at around $300 a job that's roughly $2,000 a month going to competitors.\n\nWant me to show you how the text-back works? It takes 10 minutes.`,\n  },\n  {\n    subject: () => 'free 14-day test?',\n    body: (c) => `Hi ${c.company} team,\n\nEasier idea: I'll set it up free for 14 days. If it doesn't book you any extra jobs, you owe nothing.\n\nWant me to set it up this week?`,\n  },\n  {\n    subject: () => 'closing your file',\n    body: (c) => `Hi ${c.company} team,\n\nI haven't heard back, so I'll assume the timing isn't right. I won't email again.\n\nIf missed calls ever become a headache, just reply to this email.`,\n  },\n];\n\nconst footer = `\n\n${s.yourName}\n${s.yourPhone} · ${s.yourAddress}\nNot interested? Reply \"no\" and I won't email again.`;\n\nconst sentToday = rows.filter((r) => String(r.last_email_at || '').startsWith(today)).length;\nlet remaining = Math.max(0, s.dailyLimit - sentToday);\n\n// Follow-ups first, then highest score.\nrows.sort((a, b) =>\n  (Number(b.email_step) || 0) - (Number(a.email_step) || 0) ||\n  (Number(b.lead_score) || 0) - (Number(a.lead_score) || 0)\n);\n\nconst seen = new Set();\nconst out = [];\n\nfor (const r of rows) {\n  if (remaining <= 0) break;\n  const email = String(r.email || '').trim().toLowerCase();\n  if (!/^[^@\\s]+@[^@\\s]+\\.[a-z]{2,}$/i.test(email) || seen.has(email)) continue;\n  seen.add(email); // one sequence per email address, even if it appears twice\n  if (STOP.includes(String(r.email_status || '').toLowerCase())) continue;\n  if (!allowed.includes(String(r.lead_status || '').trim().toUpperCase())) continue;\n\n  const step = parseInt(r.email_step, 10) || 0;\n  if (step >= TEMPLATES.length) continue;\n  if (step > 0 && r.next_send_at && Date.parse(r.next_send_at) > now) continue;\n\n  const c = {\n    company: String(r.business_name || 'there').trim(),\n    city: String(r.search_location || '').split(',')[0].trim() || 'your area',\n  };\n  const t = TEMPLATES[step];\n  const nextStep = step + 1;\n  const isLast = nextStep >= TEMPLATES.length;\n\n  out.push({\n    json: {\n      place_id: r.place_id,\n      email,\n      subject: t.subject(c),\n      body: t.body(c) + footer,\n      email_step: nextStep,\n      email_status: isLast ? 'finished' : 'active',\n      next_send_at: isLast ? '' : new Date(now + s.followUpDays[step] * DAY).toISOString(),\n    },\n  });\n  remaining--;\n}\n\nreturn out;"
+      }
+    },
+    {
+      "id": "e5",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "e6",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "={{ $('Settings').first().json.yourName }}"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "e7",
+      "name": "Update Lead Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        100
+      ],
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "place_id": "={{ $('Loop Over Items').item.json.place_id }}",
+            "email_step": "={{ $('Loop Over Items').item.json.email_step }}",
+            "email_status": "={{ $('Loop Over Items').item.json.email_status }}",
+            "next_send_at": "={{ $('Loop Over Items').item.json.next_send_at }}",
+            "last_email_at": "={{ new Date().toISOString() }}",
+            "last_subject": "={{ $('Loop Over Items').item.json.subject }}",
+            "gmail_thread_id": "={{ $json.threadId }}"
+          },
+          "matchingColumns": [
+            "place_id"
+          ],
+          "schema": [
+            {
+              "id": "place_id",
+              "displayName": "place_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_step",
+              "displayName": "email_step",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_status",
+              "displayName": "email_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_send_at",
+              "displayName": "next_send_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_email_at",
+              "displayName": "last_email_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_subject",
+              "displayName": "last_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "e8",
+      "name": "Wait 1-3 min",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        100
+      ],
+      "webhookId": "hvac-email-wait",
+      "parameters": {
+        "amount": "={{ 60 + Math.floor(Math.random() * 120) }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "r1",
+      "name": "New Reply in Gmail",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": true,
+        "filters": {
+          "q": "in:inbox -from:me"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "r2",
+      "name": "Classify Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        400
+      ],
+      "parameters": {
+        "jsCode": "// Turns a reply in your inbox into a status for that lead.\n// Any reply stops the sequence; \"no/stop/unsubscribe\" marks them opted out.\nconst EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i;\n\nreturn $input.all().map((i) => {\n  const m = i.json;\n  const fromRaw = String(\n    m.From || (m.from && (m.from.text || (m.from.value && m.from.value[0] && m.from.value[0].address))) || ''\n  );\n  const snippet = String(m.snippet || m.text || '').replace(/\\s+/g, ' ').slice(0, 300);\n\n  let email = ((fromRaw.match(EMAIL) || [''])[0]).toLowerCase();\n  let status =\n    /\\b(stop|unsubscribe|remove me|take me off|not interested|no thanks)\\b/i.test(snippet) ||\n    /^\\s*no\\b/i.test(snippet)\n      ? 'opted_out'\n      : 'replied';\n\n  // Bounce: the failed address is inside the bounce message.\n  if (/mailer-daemon|postmaster/i.test(fromRaw)) {\n    email = ((snippet.match(EMAIL) || [''])[0]).toLowerCase();\n    status = 'bounced';\n  }\n\n  return { json: { email, email_status: status, reply_snippet: snippet, replied_at: new Date().toISOString() } };\n}).filter((x) => x.json.email);"
+      }
+    },
+    {
+      "id": "r3",
+      "name": "Stop Sequence for Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "email_status": "={{ $json.email_status }}",
+            "reply_snippet": "={{ $json.reply_snippet }}",
+            "replied_at": "={{ $json.replied_at }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_status",
+              "displayName": "email_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reply_snippet",
+              "displayName": "reply_snippet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "replied_at",
+              "displayName": "replied_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "handlingExtraData": "insertInNewColumn"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Weekday 9am": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Read Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Leads": {
+      "main": [
+        [
+          {
+            "node": "Pick Today's Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Today's Emails": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Row": {
+      "main": [
+        [
+          {
+            "node": "Wait 1-3 min",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1-3 min": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Reply in Gmail": {
+      "main": [
+        [
+          {
+            "node": "Classify Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Reply": {
+      "main": [
+        [
+          {
+            "node": "Stop Sequence for Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
