@@ -39,6 +39,16 @@ Manchester, UK
 - Running it again is safe: rows are updated by `place_id`, never duplicated.
 - Change *Search term* for other niches: `plumber`, `roofing contractor`, `electrician`.
 
+## Owner lookup (AI)
+
+After finding the website, the workflow opens the site's **About / Our Story** page and asks OpenAI (gpt-4o-mini, well under a cent per lead) for the owner's name, title, other people, family-owned, year founded, and a one-line **personalization hook** for your cold call.
+
+Every name and year is checked against the website text; anything the AI made up is dropped. Leads with an owner name get +10 points.
+
+Setup: on the **AI Find Owner** node, select your existing **OpenAI** credential. New sheet columns are added automatically: `about_url`, `owner_name`, `owner_title`, `other_people`, `family_owned`, `founded_year`, `personalization_hook`.
+
+Many small sites don't name the owner; expect a name for roughly a third to half of leads with websites.
+
 ## Lead score
 
 | Signal | Points |

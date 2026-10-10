@@ -143,7 +143,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// Reads each website's HTML: finds emails and checks whether the business\n// already has online booking or a chat widget (if not, they need you more).\nconst leads = $('Clean + Score').all();\nconst pages = $input.all();\n\nconst BOOKING = /servicetitan|housecallpro|housecall pro|jobber|scheduleengine|book online|schedule online|book now/i;\nconst CHAT = /podium|birdeye|tawk\\.to|livechat|intercom|drift\\.com|hs-scripts|smith\\.ai|ruby\\.com/i;\nconst JUNK = /\\.(png|jpe?g|gif|svg|webp)$|example\\.|sentry|wixpress|domain\\.com|yourname|email\\.com/i;\n\nreturn leads.map((lead, i) => {\n  const page = pages[i] ? pages[i].json : {};\n  const html = typeof page.data === 'string' ? page.data : '';\n  const l = { ...lead.json };\n\n  const emails = [...new Set(\n    (html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [])\n      .map((e) => e.toLowerCase())\n      .filter((e) => !JUNK.test(e))\n  )];\n\n  l.email = emails[0] || '';\n  l.all_emails = emails.slice(0, 5).join(', ');\n  l.website_checked = html.length > 0;\n  l.has_online_booking = html ? BOOKING.test(html) : '';\n  l.has_chat_widget = html ? CHAT.test(html) : '';\n\n  const reasons = l.score_reasons ? [l.score_reasons] : [];\n  if (l.email) { l.lead_score += 10; reasons.push('email found'); }\n  if (html && !l.has_online_booking && !l.has_chat_widget) {\n    l.lead_score += 10;\n    reasons.push('no online booking or chat');\n  }\n  l.score_reasons = reasons.join(', ');\n  l.lead_status = l.lead_score >= 70 ? 'HOT' : l.lead_score >= 40 ? 'WARM' : 'COLD';\n  l.scraped_at = new Date().toISOString();\n  return { json: l };\n});"
+        "jsCode": "// Reads each website's HTML: finds emails and checks whether the business\n// already has online booking or a chat widget (if not, they need you more).\nconst leads = $('Clean + Score').all();\nconst pages = $input.all();\n\nconst BOOKING = /servicetitan|housecallpro|housecall pro|jobber|scheduleengine|book online|schedule online|book now/i;\nconst CHAT = /podium|birdeye|tawk\\.to|livechat|intercom|drift\\.com|hs-scripts|smith\\.ai|ruby\\.com/i;\nconst JUNK = /\\.(png|jpe?g|gif|svg|webp)$|example\\.|sentry|wixpress|domain\\.com|yourname|email\\.com/i;\n\nreturn leads.map((lead, i) => {\n  const page = pages[i] ? pages[i].json : {};\n  const html = typeof page.data === 'string' ? page.data : '';\n  const l = { ...lead.json };\n\n  const emails = [...new Set(\n    (html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) || [])\n      .map((e) => e.toLowerCase())\n      .filter((e) => !JUNK.test(e))\n  )];\n\n  l.email = emails[0] || '';\n  l.all_emails = emails.slice(0, 5).join(', ');\n  l.website_checked = html.length > 0;\n  l.has_online_booking = html ? BOOKING.test(html) : '';\n  l.has_chat_widget = html ? CHAT.test(html) : '';\n\n  const reasons = l.score_reasons ? [l.score_reasons] : [];\n  if (l.email) { l.lead_score += 10; reasons.push('email found'); }\n  if (html && !l.has_online_booking && !l.has_chat_widget) {\n    l.lead_score += 10;\n    reasons.push('no online booking or chat');\n  }\n  l.score_reasons = reasons.join(', ');\n  l.lead_status = l.lead_score >= 70 ? 'HOT' : l.lead_score >= 40 ? 'WARM' : 'COLD';\n  l.scraped_at = new Date().toISOString();\n\n  // Find the site's About / Our Story page for the owner lookup.\n  let about = '';\n  if (html && l.website) {\n    const links = [...html.matchAll(/href=[\"']([^\"'#]+)[\"']/gi)].map((m) => m[1]);\n    const hit = links.find((h) =>\n      /about|our-story|who-we-are|our-team|meet-the|family|history/i.test(h) &&\n      !/\\.(jpe?g|png|gif|pdf|svg)$/i.test(h)\n    );\n    try {\n      if (hit) {\n        const u = new URL(hit, l.website);\n        if (u.host === new URL(l.website).host) about = u.href;\n      }\n    } catch (e) {}\n  }\n  l.about_url = about;\n  return { json: l };\n});"
       }
     },
     {
@@ -152,7 +152,7 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1320,
+        2420,
         0
       ],
       "parameters": {
@@ -184,6 +184,152 @@
           "id": "",
           "name": "Google Sheets account"
         }
+      }
+    },
+    {
+      "id": "o1",
+      "name": "Fetch About Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "={{ $json.about_url || 'https://invalid.invalid' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "o2",
+      "name": "Prepare AI Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Turns the homepage + About page into plain text for the AI owner lookup.\nconst leads = $('Find Emails + Booking Check').all();\nconst homes = $('Fetch Website').all();\nconst abouts = $input.all();\n\nconst ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&#39;': \"'\", '&quot;': '\"', '&rsquo;': \"'\" };\nconst toText = (html) => String(html || '')\n  .replace(/<(script|style|noscript|svg)[\\s\\S]*?<\\/\\1>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;|&amp;|&#39;|&quot;|&rsquo;/g, (m) => ENTITIES[m])\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst SYSTEM = \"You extract facts about a local business from its own website text.\\nReturn JSON only: {\\\"owner_name\\\": \\\"\\\", \\\"owner_title\\\": \\\"\\\", \\\"other_people\\\": [{\\\"name\\\": \\\"\\\", \\\"title\\\": \\\"\\\"}], \\\"family_owned\\\": true|false|null, \\\"founded_year\\\": \\\"\\\", \\\"personalization_hook\\\": \\\"\\\"}.\\nRules:\\n- owner_name = the owner, founder, president or CEO. Copy the name exactly as written in the text.\\n- Only use names that appear in the text. Never guess. If unknown, use \\\"\\\".\\n- family_owned: true only if the text says family-owned/family business or names family members running it; null if not stated.\\n- founded_year: 4-digit year only if stated, else \\\"\\\".\\n- personalization_hook: one short, friendly sentence a salesperson could say on a cold call, based only on facts in the text (years in business, family-owned, awards, community work). \\\"\\\" if nothing specific.\";\n\nreturn leads.map((lead, i) => {\n  const home = toText(homes[i] && homes[i].json.data);\n  const about = lead.json.about_url ? toText(abouts[i] && abouts[i].json.data) : '';\n  const pageText = (about ? 'ABOUT PAGE:\\n' + about.slice(0, 5000) + '\\n\\n' : '') +\n    (home ? 'HOMEPAGE:\\n' + home.slice(0, 4000) : '');\n\n  const json = { ...lead.json, page_text: pageText };\n  if (pageText) {\n    json.ai_request = {\n      model: 'gpt-4o-mini',\n      temperature: 0,\n      response_format: { type: 'json_object' },\n      messages: [\n        { role: 'system', content: SYSTEM },\n        { role: 'user', content: 'Business name: ' + lead.json.business_name + '\\n\\n' + pageText },\n      ],\n    };\n  }\n  return { json };\n});"
+      }
+    },
+    {
+      "id": "o3",
+      "name": "Has Website Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.page_text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "o4",
+      "name": "AI Find Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        -100
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ai_request) }}",
+        "options": {
+          "timeout": 60000,
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "id": "o5",
+      "name": "Verify Owner Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Keeps only facts the AI found that really appear on the website,\n// so owner names are never invented.\nconst lead = $('Prepare AI Input').item.json;\nlet ai = {};\ntry {\n  ai = JSON.parse($json.choices[0].message.content);\n} catch (e) {}\n\nconst text = String(lead.page_text || '').toLowerCase();\nconst clean = (v) => (v === null || v === undefined ? '' : String(v).trim());\nconst onPage = (v) => clean(v).length > 2 && text.includes(clean(v).toLowerCase());\n\nconst owner = onPage(ai.owner_name) ? clean(ai.owner_name) : '';\nconst others = (Array.isArray(ai.other_people) ? ai.other_people : [])\n  .filter((p) => p && onPage(p.name) && clean(p.name) !== owner)\n  .slice(0, 4)\n  .map((p) => (clean(p.title) ? clean(p.name) + ' (' + clean(p.title) + ')' : clean(p.name)))\n  .join(', ');\nconst year = /^(18|19|20)\\d{2}$/.test(clean(ai.founded_year)) && text.includes(clean(ai.founded_year))\n  ? clean(ai.founded_year) : '';\n\nconst { page_text, ai_request, ...rest } = lead;\nconst out = {\n  ...rest,\n  owner_name: owner,\n  owner_title: owner ? clean(ai.owner_title) : '',\n  other_people: others,\n  family_owned: ai.family_owned === true ? 'yes' : ai.family_owned === false ? 'no' : '',\n  founded_year: year,\n  personalization_hook: clean(ai.personalization_hook).slice(0, 300),\n};\n\nif (owner) {\n  out.lead_score += 10;\n  out.score_reasons = [out.score_reasons, 'owner name found'].filter(Boolean).join(', ');\n  out.lead_status = out.lead_score >= 70 ? 'HOT' : out.lead_score >= 40 ? 'WARM' : 'COLD';\n}\n\nreturn { json: out };"
+      }
+    },
+    {
+      "id": "o6",
+      "name": "No Website Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// No website text: keep the lead, with empty owner fields.\nreturn $input.all().map((item) => {\n  const { page_text, ai_request, ...rest } = item.json;\n  return {\n    json: {\n      ...rest,\n      owner_name: '', owner_title: '', other_people: '',\n      family_owned: '', founded_year: '', personalization_hook: '',\n    },\n  };\n});"
       }
     }
   ],
@@ -236,7 +382,7 @@
       "main": [
         [
           {
-            "node": "Save to Google Sheet",
+            "node": "Fetch About Page",
             "type": "main",
             "index": 0
           }
@@ -248,6 +394,79 @@
         [
           {
             "node": "Clean + Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch About Page": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Input": {
+      "main": [
+        [
+          {
+            "node": "Has Website Text?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Website Text?": {
+      "main": [
+        [
+          {
+            "node": "AI Find Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Website Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Find Owner": {
+      "main": [
+        [
+          {
+            "node": "Verify Owner Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Owner Info": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Website Info": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheet",
             "type": "main",
             "index": 0
           }
