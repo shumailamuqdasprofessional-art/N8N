@@ -1,0 +1,16 @@
+{
+  "name": "meta-webhook-n8n",
+  "version": "1.0.0",
+  "description": "Meta (WhatsApp/Instagram/Messenger) webhook that verifies the handshake and forwards events to n8n",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "express": "^4.21.1"
+  }
+}
