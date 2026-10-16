@@ -1,38 +1,50 @@
 # Twilio Dialer
 
-A phone in your browser: make calls to any number and answer calls to your Twilio number.
-Built with Express and the Twilio Voice JavaScript SDK.
+A phone in your browser. It calls any number from your Twilio (USA) number, and it rings when someone calls that number.
 
 **Features:** keypad, call/hang up, mute, keypad tones during a call (for phone menus), answer or decline incoming calls, call timer, password login.
 
-## 1. Set up Twilio (one time)
-1. **Phone number:** in the Twilio Console, buy a number with Voice. This is your caller ID (`TWILIO_CALLER_ID`, e.g. `+15551234567`).
-2. **API key:** go to Console → Account → API keys & tokens → *Create API key* (Standard). Copy the SID (`SK…`) and the Secret.
-3. **TwiML App:** go to Console → Voice → TwiML Apps → *Create*. Set the **Voice Request URL** to
-   `https://YOUR-DIALER-URL/voice` (HTTP POST). Copy its SID (`AP…`).
-4. **Incoming calls (optional):** open your phone number's settings. Under *A call comes in*, choose that same TwiML App, or use the webhook `https://YOUR-DIALER-URL/voice`.
-5. **Trial accounts** can only call numbers you have verified. Calls to other countries must be allowed under Voice → Settings → *Geo Permissions*.
+## It sets up Twilio for you
+You only give it **3 things**. When you log in for the first time, it automatically:
+- creates an API key,
+- creates a TwiML App named **"Twilio Dialer"** that points to this dialer,
+- uses your Twilio phone number as the caller ID,
+- connects incoming calls on that number to the dialer, if the number isn't already used for something else.
 
-## 2. Run it
+## 1. Get your Twilio details
+On the Twilio Console home page (console.twilio.com), copy the **Account SID** and the **Auth Token**.
+
+You need at least one Twilio phone number that can make calls (Phone Numbers → Active numbers).
+
+## 2. Put it online (needs https)
+Twilio must be able to reach the dialer on the internet. Any Node.js host works (Hostinger Node.js app, Render, Railway…):
+- **Root folder:** `dialer`
+- **Build command:** `npm install`
+- **Start command:** `npm start`
+- **Environment variables:**
+  - `TWILIO_ACCOUNT_SID`
+  - `TWILIO_AUTH_TOKEN`
+  - `DIALER_PASSWORD`, a long password you choose
+  - `PUBLIC_URL`, your site address such as `https://dialer.yoursite.com` (recommended)
+
+To test on your own computer instead:
 ```bash
 cd dialer
 npm install
-cp .env.example .env    # fill in your values
+cp .env.example .env      # fill in the 3 values
+npx ngrok http 3000       # in a second window; copy the https URL into PUBLIC_URL
 node --env-file=.env server.js
 ```
-Open http://localhost:3000 and enter your `DIALER_PASSWORD`.
 
-Twilio must be able to reach `/voice`. To test on your own computer, start a tunnel (for example `ngrok http 3000`) and use the tunnel URL in the TwiML App.
+## 3. Call
+Open your https address, enter the password, and allow the microphone. Type a number with its country code (for example `+1 212 555 0100`) and press **Call**.
 
-## 3. Deploy
-You can host it on any Node.js service (Hostinger Node.js, Render, Railway, …):
-- **Start command:** `npm start`
-- **Root folder:** `dialer`
-- **Environment variables:** everything from `.env.example`. Set `PUBLIC_URL` to your public `https://` address so Twilio's security check passes behind a proxy.
-
-The page needs **HTTPS** to use the microphone, except on `localhost`.
+## If a call doesn't go through
+- **Trial account:** you can only call numbers that are verified under Phone Numbers → Verified Caller IDs. The other person also hears a short trial message first. To call anyone, upgrade the account.
+- **Calls to other countries:** turn on each country under Voice → Settings → Geo Permissions.
+- **Calls don't ring in the browser:** your number already had its own call settings, so the dialer left them alone (the server log says so). In Twilio, open your number and set *A call comes in* to the TwiML App **Twilio Dialer**.
 
 ## Security
-- `/token` needs `DIALER_PASSWORD`, so strangers can't make calls on your account. Use a long password.
+- Only someone with `DIALER_PASSWORD` can make calls. Use a long password.
 - `/voice` checks Twilio's signature and rejects any other request.
-- Numbers must be in `+countrycode…` format. Turn off countries you don't call in Twilio *Geo Permissions* to prevent fraud.
+- Never share your Auth Token or commit it to GitHub. `.env` is already ignored by git.
