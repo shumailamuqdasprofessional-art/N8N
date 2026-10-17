@@ -1,0 +1,73 @@
+{
+  "name": "Twilio - Call Dialer",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0003-4000-8000-000000000001",
+      "name": "Start Dialing",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Put the people to call here (or replace this node with Google Sheets)\nreturn [\n  { json: { name: 'Customer One', phone: '+10000000001' } },\n  { json: { name: 'Customer Two', phone: '+10000000002' } }\n];"
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000002",
+      "name": "Call List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "One At A Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "resource": "call",
+        "from": "+10000000000",
+        "to": "={{ $json.phone }}",
+        "twiml": true,
+        "message": "=<Response><Say>Hello {{ $json.name }}, this is a call from our team. Please hold while we connect you.</Say><Dial>+10000000009</Dial></Response>",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000004",
+      "name": "Make Call",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [680, 80]
+    },
+    {
+      "parameters": { "amount": 30 },
+      "id": "a1b2c3d4-0003-4000-8000-000000000005",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [900, 80],
+      "webhookId": "a1b2c3d4-0003-4000-8000-0000000000aa"
+    }
+  ],
+  "connections": {
+    "Start Dialing": {
+      "main": [[{ "node": "Call List", "type": "main", "index": 0 }]]
+    },
+    "Call List": {
+      "main": [[{ "node": "One At A Time", "type": "main", "index": 0 }]]
+    },
+    "One At A Time": {
+      "main": [[], [{ "node": "Make Call", "type": "main", "index": 0 }]]
+    },
+    "Make Call": {
+      "main": [[{ "node": "Wait 30s", "type": "main", "index": 0 }]]
+    },
+    "Wait 30s": {
+      "main": [[{ "node": "One At A Time", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

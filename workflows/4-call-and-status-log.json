@@ -1,0 +1,34 @@
+{
+  "name": "Twilio - Call & Status Log",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-events",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000001",
+      "name": "Calls & Status (from app.js)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "a1b2c3d4-0004-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean record of each call / delivery update. Connect Google Sheets, Airtable or email after this node.\nreturn $input.all().map(item => {\n  const b = item.json.body || {};\n  return { json: {\n    time: new Date().toISOString(),\n    type: b.source,\n    from: b.From || '',\n    to: b.To || '',\n    status: b.CallStatus || b.MessageStatus || b.SmsStatus || '',\n    callSid: b.CallSid || '',\n    messageSid: b.MessageSid || '',\n    recordingUrl: b.RecordingUrl || ''\n  }};\n});"
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000002",
+      "name": "Format Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    }
+  ],
+  "connections": {
+    "Calls & Status (from app.js)": {
+      "main": [[{ "node": "Format Log", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

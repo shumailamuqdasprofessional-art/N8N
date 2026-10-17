@@ -1,0 +1,63 @@
+{
+  "name": "Twilio - Incoming SMS Auto Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-sms",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000001",
+      "name": "Incoming SMS (from app.js)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "a1b2c3d4-0002-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c0000000-0002-4000-8000-000000000001",
+              "leftValue": "={{ $json.body.source }}",
+              "rightValue": "twilio_sms",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Is Twilio SMS?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "from": "={{ $json.body.To.replace('whatsapp:', '') }}",
+        "to": "={{ $json.body.From.replace('whatsapp:', '') }}",
+        "toWhatsapp": "={{ $json.body.From.startsWith('whatsapp:') }}",
+        "message": "=Thanks for your message! We received: \"{{ $json.body.Body }}\". Our team will reply soon.",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000003",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [480, -100]
+    }
+  ],
+  "connections": {
+    "Incoming SMS (from app.js)": {
+      "main": [[{ "node": "Is Twilio SMS?", "type": "main", "index": 0 }]]
+    },
+    "Is Twilio SMS?": {
+      "main": [[{ "node": "Send Reply", "type": "main", "index": 0 }], []]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

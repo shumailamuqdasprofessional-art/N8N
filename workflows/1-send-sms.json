@@ -1,0 +1,39 @@
+{
+  "name": "Twilio - Send SMS / WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-sms",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Send Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "a1b2c3d4-0001-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "from": "+10000000000",
+        "to": "={{ $json.body.to }}",
+        "toWhatsapp": "={{ $json.body.whatsapp === true }}",
+        "message": "={{ $json.body.message }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [240, 0]
+    }
+  ],
+  "connections": {
+    "Send Request": {
+      "main": [[{ "node": "Send SMS", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
