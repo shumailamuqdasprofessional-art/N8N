@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Phone Number > Voice > A call comes in. Replace +1YOURMOBILE with your phone. -->
+<Response>
+  <Say>Thank you for calling. Please hold while we connect you.</Say>
+  <Dial timeout="25" answerOnBridge="true">
+    <Client>agent</Client>
+    <Number>+1YOURMOBILE</Number>
+  </Dial>
+  <Say>Sorry, no one is available. Please leave a message after the beep.</Say>
+  <Record maxLength="120" playBeep="true" />
+</Response>
