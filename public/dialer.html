@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dialer</title>
+  <style>
+    :root {
+      --bg: #f4f5f7; --card: #ffffff; --text: #16181d; --muted: #6b7280; --line: #e5e7eb;
+      --key: #f1f3f6; --key-hover: #e6e9ee; --green: #16a34a; --green-dark: #128a3e;
+      --red: #dc2626; --red-dark: #b91c1c; --accent: #2563eb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115; --card: #181b21; --text: #f3f4f6; --muted: #9ca3af; --line: #2a2f38;
+        --key: #232731; --key-hover: #2c313d; --accent: #60a5fa;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); color: var(--text); padding: 16px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    .card {
+      width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--line);
+      border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    h1 { font-size: 18px; margin: 0; }
+    .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.online { background: var(--green); }
+    .dot.busy { background: var(--red); }
+    input#number {
+      width: 100%; font-size: 26px; text-align: center; padding: 12px 8px; letter-spacing: 1px;
+      border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--text);
+    }
+    input#number:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .info { min-height: 20px; text-align: center; font-size: 14px; color: var(--muted); margin: 10px 0; }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .keypad button {
+      height: 56px; border: 0; border-radius: 14px; background: var(--key); color: var(--text);
+      font-size: 22px; cursor: pointer; line-height: 1;
+    }
+    .keypad button small { display: block; font-size: 9px; letter-spacing: 2px; color: var(--muted); margin-top: 2px; }
+    .keypad button:hover { background: var(--key-hover); }
+    .actions { display: flex; gap: 10px; }
+    .actions button {
+      flex: 1; height: 52px; border: 0; border-radius: 14px; font-size: 16px; font-weight: 600;
+      color: #fff; cursor: pointer;
+    }
+    .actions button:disabled { opacity: .45; cursor: not-allowed; }
+    .call { background: var(--green); } .call:hover:not(:disabled) { background: var(--green-dark); }
+    .hang { background: var(--red); } .hang:hover:not(:disabled) { background: var(--red-dark); }
+    .secondary { background: var(--key) !important; color: var(--text) !important; }
+    .start { width: 100%; height: 52px; border: 0; border-radius: 14px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .incoming {
+      display: none; border: 1px solid var(--green); border-radius: 14px; padding: 12px; margin-bottom: 14px; text-align: center;
+    }
+    .incoming.show { display: block; }
+    .incoming .actions { margin-top: 10px; }
+    .hidden { display: none !important; }
+    .recent { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+    .recent h2 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 6px; }
+    .recent ul { list-style: none; margin: 0; padding: 0; max-height: 150px; overflow-y: auto; }
+    .recent li { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; cursor: pointer; }
+    .recent li span:last-child { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header>
+      <h1>Dialer</h1>
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">Offline</span></div>
+    </header>
+
+    <button class="start" id="startBtn">Go online</button>
+
+    <div id="phone" class="hidden">
+      <div class="incoming" id="incoming">
+        <strong>Incoming call</strong>
+        <div id="incomingFrom"></div>
+        <div class="actions">
+          <button class="call" id="acceptBtn">Answer</button>
+          <button class="hang" id="rejectBtn">Decline</button>
+        </div>
+      </div>
+
+      <input id="number" type="tel" placeholder="+1 555 123 4567" autocomplete="off" inputmode="tel">
+      <div class="info" id="info">Type a number with country code</div>
+
+      <div class="keypad" id="keypad"></div>
+
+      <div class="actions">
+        <button class="call" id="callBtn">Call</button>
+        <button class="secondary hidden" id="muteBtn">Mute</button>
+        <button class="hang hidden" id="hangBtn">Hang up</button>
+      </div>
+
+      <div class="recent">
+        <h2>Recent calls</h2>
+        <ul id="recentList"></ul>
+      </div>
+    </div>
+  </main>
+
+  <script src="/dialer/twilio.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const KEYS = [['1',''],['2','ABC'],['3','DEF'],['4','GHI'],['5','JKL'],['6','MNO'],['7','PQRS'],['8','TUV'],['9','WXYZ'],['*',''],['0','+'],['#','']];
+
+    let device = null;
+    let activeCall = null;
+    let pendingIncoming = null;
+    let timer = null;
+
+    // Build keypad
+    for (const [digit, letters] of KEYS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = `${digit}<small>${letters || '&nbsp;'}</small>`;
+      b.addEventListener('click', () => pressKey(digit));
+      // Long-press 0 for +
+      if (digit === '0') b.addEventListener('contextmenu', (e) => { e.preventDefault(); pressKey('+'); });
+      $('keypad').appendChild(b);
+    }
+
+    function pressKey(digit) {
+      if (activeCall) { activeCall.sendDigits(digit); return; } // menu choices during a call
+      $('number').value += digit;
+      $('number').focus();
+    }
+
+    function setStatus(text, state) {
+      $('statusText').textContent = text;
+      $('dot').className = 'dot ' + (state || '');
+    }
+
+    function toE164(value) {
+      const text = value.trim();
+      const digits = text.replace(/\D/g, '');
+      if (text.startsWith('+') && digits.length >= 8) return '+' + digits;
+      if (digits.length === 10) return '+1' + digits;
+      if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+      return null;
+    }
+
+    async function getToken() {
+      const res = await fetch('/dialer/token');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not get token');
+      return data.token;
+    }
+
+    // Recent calls (kept only in this browser)
+    function loadRecent() {
+      try { return JSON.parse(localStorage.getItem('recentCalls') || '[]'); } catch { return []; }
+    }
+    function saveRecent(number, direction) {
+      const list = [{ number, direction, time: new Date().toLocaleString() }, ...loadRecent()].slice(0, 20);
+      try { localStorage.setItem('recentCalls', JSON.stringify(list)); } catch {}
+      renderRecent();
+    }
+    function renderRecent() {
+      $('recentList').innerHTML = '';
+      for (const c of loadRecent()) {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${c.direction === 'in' ? '↙' : '↗'} ${c.number}</span><span>${c.time}</span>`;
+        li.addEventListener('click', () => { if (!activeCall) $('number').value = c.number; });
+        $('recentList').appendChild(li);
+      }
+    }
+
+    function startTimer() {
+      const start = Date.now();
+      timer = setInterval(() => {
+        const s = Math.floor((Date.now() - start) / 1000);
+        $('info').textContent = `In call · ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    function showInCall(on) {
+      $('callBtn').classList.toggle('hidden', on);
+      $('hangBtn').classList.toggle('hidden', !on);
+      $('muteBtn').classList.toggle('hidden', !on);
+      $('muteBtn').textContent = 'Mute';
+      $('number').disabled = on;
+      setStatus(on ? 'On a call' : 'Online', on ? 'busy' : 'online');
+    }
+
+    function wireCall(call) {
+      activeCall = call;
+      showInCall(true);
+      call.on('accept', () => startTimer());
+      const end = (msg) => {
+        clearInterval(timer);
+        activeCall = null;
+        showInCall(false);
+        $('info').textContent = msg;
+      };
+      call.on('disconnect', () => end('Call ended'));
+      call.on('cancel', () => end('Call cancelled'));
+      call.on('reject', () => end('Call declined'));
+      call.on('error', (e) => end('Error: ' + e.message));
+    }
+
+    async function goOnline() {
+      $('startBtn').disabled = true;
+      $('startBtn').textContent = 'Connecting…';
+      try {
+        device = new Twilio.Device(await getToken(), { codecPreferences: ['opus', 'pcmu'], closeProtection: true });
+
+        device.on('registered', () => setStatus('Online', 'online'));
+        device.on('unregistered', () => setStatus('Offline'));
+        device.on('error', (e) => { $('info').textContent = 'Error: ' + e.message; });
+        device.on('tokenWillExpire', async () => device.updateToken(await getToken()));
+
+        device.on('incoming', (call) => {
+          if (activeCall) { call.reject(); return; }
+          pendingIncoming = call;
+          $('incomingFrom').textContent = call.parameters.From || 'Unknown';
+          $('incoming').classList.add('show');
+          const clear = () => { pendingIncoming = null; $('incoming').classList.remove('show'); };
+          call.on('cancel', clear);
+          call.on('disconnect', clear);
+        });
+
+        await device.register();
+        $('startBtn').classList.add('hidden');
+        $('phone').classList.remove('hidden');
+        renderRecent();
+        $('number').focus();
+      } catch (e) {
+        $('startBtn').disabled = false;
+        $('startBtn').textContent = 'Go online';
+        alert('Could not start the dialer: ' + e.message);
+      }
+    }
+
+    async function placeCall() {
+      const to = toE164($('number').value);
+      if (!to) { $('info').textContent = 'Use a full number, e.g. +15551234567'; return; }
+      $('number').value = to;
+      $('info').textContent = 'Calling ' + to + '…';
+      saveRecent(to, 'out');
+      try {
+        wireCall(await device.connect({ params: { To: to } }));
+      } catch (e) {
+        $('info').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    $('startBtn').addEventListener('click', goOnline);
+    $('callBtn').addEventListener('click', placeCall);
+    $('hangBtn').addEventListener('click', () => activeCall && activeCall.disconnect());
+    $('muteBtn').addEventListener('click', () => {
+      if (!activeCall) return;
+      activeCall.mute(!activeCall.isMuted());
+      $('muteBtn').textContent = activeCall.isMuted() ? 'Unmute' : 'Mute';
+    });
+    $('number').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !activeCall) placeCall(); });
+    $('acceptBtn').addEventListener('click', () => {
+      if (!pendingIncoming) return;
+      const call = pendingIncoming;
+      $('incoming').classList.remove('show');
+      pendingIncoming = null;
+      saveRecent(call.parameters.From || 'Unknown', 'in');
+      wireCall(call);
+      call.accept();
+    });
+    $('rejectBtn').addEventListener('click', () => { if (pendingIncoming) pendingIncoming.reject(); });
+  </script>
+</body>
+</html>

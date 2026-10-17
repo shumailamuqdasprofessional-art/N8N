@@ -9,6 +9,8 @@ A small server that receives messages and calls and sends them to n8n.
 | `POST /twilio/sms` | Twilio | Incoming SMS / WhatsApp → n8n (`N8N_TWILIO_SMS_URL`) |
 | `POST /twilio/voice` | Twilio | Incoming call: plays greeting, forwards to `FORWARD_CALLS_TO` (or records voicemail) → n8n |
 | `POST /twilio/status` | Twilio | Delivery / call status updates → n8n |
+| `GET /dialer` | You (browser) | **Browser phone**: keypad to call anyone and answer incoming calls (password protected) |
+| `POST /twilio/client-voice` | Twilio (TwiML App) | Connects calls made from the browser phone |
 
 ## 1. Run the server
 
@@ -35,6 +37,20 @@ Set `PUBLIC_URL` to your app's public address, or the check will fail behind the
    After approval, check that your number is in the **Messaging Service** linked to the campaign.
    In that Messaging Service, open **Integration** and choose **Defer to sender's webhook**
    (or **Send a webhook** → `https://YOUR-APP/twilio/sms`). Otherwise the service can override the number's webhook.
+
+## 2b. Browser phone (`/dialer`)
+
+Call from your computer or phone browser, no app needed.
+
+1. **API key**: Console → Account → API keys & tokens → Create API key (Standard).
+   Save the **SID** (`SK...`) and the **Secret**. The secret is shown only once.
+2. **TwiML App**: Console → Voice → TwiML Apps → open your app (`AP...`) and set
+   **Voice Request URL** → `https://YOUR-APP/twilio/client-voice` (HTTP POST). Save.
+3. Set these environment variables on your host: `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`,
+   `TWILIO_API_KEY_SECRET`, `TWIML_APP_SID`, `TWILIO_CALLER_ID` (your Twilio number), `DIALER_PASSWORD`,
+   and `RING_BROWSER=true` if incoming calls should ring the page.
+4. Open `https://YOUR-APP/dialer` and log in with any username plus your `DIALER_PASSWORD`.
+   Click **Go online** and allow the microphone. Type a number and click **Call**.
 
 ## 3. n8n setup
 
