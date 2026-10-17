@@ -32,6 +32,9 @@ Set `PUBLIC_URL` to your app's public address, or the check will fail behind the
    - **Voice → Call status changes** → `https://YOUR-APP/twilio/status` (optional)
 4. Trial accounts can only text or call **verified numbers** (Phone Numbers → Verified Caller IDs).
 5. US numbers: finish **A2P 10DLC** registration before sending real SMS.
+   After approval, check that your number is in the **Messaging Service** linked to the campaign.
+   In that Messaging Service, open **Integration** and choose **Defer to sender's webhook**
+   (or **Send a webhook** → `https://YOUR-APP/twilio/sms`). Otherwise the service can override the number's webhook.
 
 ## 3. n8n setup
 
