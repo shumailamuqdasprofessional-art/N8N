@@ -8,8 +8,8 @@
         "width": 420,
         "color": 4
       },
-      "id": "67baca5b-196e-4734-8ab1-81a6d31b5194",
-      "name": "Note 6b5008",
+      "id": "07c81db2-6697-44ef-835f-f4a6956784df",
+      "name": "Note 5ccf24",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -48,7 +48,7 @@
           ]
         }
       },
-      "id": "a6b32b74-b2dc-4a2f-be61-fb6e1c61364a",
+      "id": "768b0d42-60fa-4ce7-8e38-12fbc0410cb5",
       "name": "When Called by AI Receptionist",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -61,7 +61,7 @@
       "parameters": {
         "jsCode": "// ================= EDIT THESE SETTINGS =================\nconst config = {\n  businessName: 'Your HVAC Company',\n  timezone: 'America/New_York',\n  sheetId: 'YOUR_GOOGLE_SHEET_ID',      // same file as the call CRM\n  staffSmsNumber: '+15555550100',\n  maxJobsPerWindow: 2,                  // how many technicians per time window\n  closedWeekdays: [7],                  // 1 = Monday ... 7 = Sunday\n};\nconst slots = ['8am-10am', '10am-12pm', '12pm-2pm', '2pm-4pm', '4pm-6pm'];\n// =======================================================\n\nconst i = $input.first().json;\nconst norm = (s) => String(s || '').toLowerCase().replace(/\\s+|:00|\\./g, '').replace(/\u2013|\u2014|to/g, '-');\nconst timeWindow = slots.find((s) => norm(s) === norm(i.time_window)) || String(i.time_window || '');\n\nconst date = DateTime.fromISO(String(i.preferred_date || '').trim(), { zone: config.timezone });\nconst today = $now.setZone(config.timezone).startOf('day');\nlet problem = '';\nif (!date.isValid) problem = 'The date was not understood. Ask the caller for the date again.';\nelse if (date < today) problem = 'That date is in the past. Ask for a future date.';\nelse if (config.closedWeekdays.includes(date.weekday)) problem = `We are closed on ${date.toFormat('cccc')}s. Ask for another day.`;\nelse if (!slots.includes(timeWindow)) problem = `Time window must be one of: ${slots.join(', ')}.`;\n\nreturn [{\n  json: {\n    config, slots, problem,\n    customerName: String(i.customer_name || '').trim(),\n    phone: i.caller_phone || '',\n    twilioNumber: i.twilio_number || '',\n    callSid: i.call_sid || '',\n    address: String(i.service_address || '').trim(),\n    issue: String(i.issue || '').trim(),\n    date: date.isValid ? date.toISODate() : '',\n    dateSpoken: date.isValid ? date.toFormat('cccc, LLLL d') : '',\n    timeWindow,\n    bookingId: 'HV-' + $now.toFormat('yyMMdd') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),\n    createdAt: $now.setZone(config.timezone).toFormat('yyyy-LL-dd HH:mm:ss'),\n  },\n}];"
       },
-      "id": "3343d240-090f-412d-a916-faebb054c75a",
+      "id": "d94e17e2-5c97-4148-9876-e6157b298b51",
       "name": "Booking Settings & Validate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -93,7 +93,7 @@
           ]
         }
       },
-      "id": "c5a8b4b4-f75e-46d3-a8a9-2a55e772891e",
+      "id": "3e4b1ce5-ff6f-4b3a-8648-76d303384c94",
       "name": "Get Bookings That Day",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -113,7 +113,7 @@
       "parameters": {
         "jsCode": "const b = $('Booking Settings & Validate').first().json;\nconst rows = $input.all().map((x) => x.json).filter((r) => r && r.Date);\nconst booked = (w) => rows.filter((r) =>\n  String(r.Date) === b.date && String(r.TimeWindow) === w &&\n  String(r.Status || '').toLowerCase() !== 'cancelled').length;\n\nconst freeWindows = b.slots.filter((w) => booked(w) < b.config.maxJobsPerWindow);\nconst available = !b.problem && freeWindows.includes(b.timeWindow);\n\nlet message = '';\nif (b.problem) message = 'NOT BOOKED. ' + b.problem;\nelse if (!available) message = freeWindows.length\n  ? `NOT BOOKED. The ${b.timeWindow} window on ${b.dateSpoken} is full. Free windows that day: ${freeWindows.join(', ')}.`\n  : `NOT BOOKED. ${b.dateSpoken} is fully booked. Ask the caller for another day.`;\n\nreturn [{ json: { ...b, available, freeWindows, message } }];"
       },
-      "id": "11becd12-7855-46ec-9d3b-37ef286299ad",
+      "id": "2f299fb7-6512-4043-814b-92853049626f",
       "name": "Check Availability",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -133,7 +133,7 @@
           },
           "conditions": [
             {
-              "id": "582c1445-a1aa-4ea6-8c88-7617d6251b68",
+              "id": "da1364aa-a5ce-4920-83c1-f1ec0e901578",
               "leftValue": "={{ $json.available }}",
               "rightValue": "",
               "operator": {
@@ -147,7 +147,7 @@
         },
         "options": {}
       },
-      "id": "a5a57552-674f-4c46-b4a3-80c0238a5f8d",
+      "id": "f23c98c6-b735-46d0-a44f-eb7bbd1403ae",
       "name": "Slot Free?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -283,7 +283,7 @@
           "cellFormat": "RAW"
         }
       },
-      "id": "9c8ab0e1-007e-43fe-b6a2-1c60f1c16bc4",
+      "id": "49a50dbb-af08-457c-a553-bbcc39ad43cc",
       "name": "Save Booking",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -306,7 +306,7 @@
         "message": "=Hi {{ $('Booking Settings & Validate').first().json.customerName }}, your {{ $('Booking Settings & Validate').first().json.config.businessName }} appointment is booked for {{ $('Booking Settings & Validate').first().json.dateSpoken }}, {{ $('Booking Settings & Validate').first().json.timeWindow }} at {{ $('Booking Settings & Validate').first().json.address }}. Booking ID {{ $('Booking Settings & Validate').first().json.bookingId }}. Call us to make changes.",
         "options": {}
       },
-      "id": "6d351bb9-2040-4461-9191-ee162bcbba77",
+      "id": "b5758274-5073-4d07-b119-96e73ff47ecc",
       "name": "Customer Confirmation SMS",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
@@ -330,7 +330,7 @@
         "message": "=New booking {{ $('Booking Settings & Validate').first().json.bookingId }}: {{ $('Booking Settings & Validate').first().json.customerName }} ({{ $('Booking Settings & Validate').first().json.phone }}), {{ $('Booking Settings & Validate').first().json.dateSpoken }} {{ $('Booking Settings & Validate').first().json.timeWindow }}, {{ $('Booking Settings & Validate').first().json.address }}. Issue: {{ $('Booking Settings & Validate').first().json.issue }}",
         "options": {}
       },
-      "id": "a6e4cda7-1136-42e4-9959-03dbc2308c6d",
+      "id": "b3a88f90-f65d-44b4-bfed-3b677feb7948",
       "name": "Staff New Booking SMS",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
@@ -352,7 +352,7 @@
         "assignments": {
           "assignments": [
             {
-              "id": "1ae9727f-6717-4753-abdb-a93d6f546c14",
+              "id": "5911b823-a134-43f0-94bf-85fcebe98e4b",
               "name": "result",
               "value": "=BOOKED. Booking ID {{ $('Booking Settings & Validate').first().json.bookingId }} for {{ $('Booking Settings & Validate').first().json.customerName }} on {{ $('Booking Settings & Validate').first().json.dateSpoken }}, {{ $('Booking Settings & Validate').first().json.timeWindow }}. A confirmation text was sent to the caller.",
               "type": "string"
@@ -362,7 +362,7 @@
         "includeOtherFields": false,
         "options": {}
       },
-      "id": "f10ec040-74a4-48fa-abce-c371d999788e",
+      "id": "88360c12-abb0-45ee-9f27-ce5a50a5011e",
       "name": "Booked Result",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -377,7 +377,7 @@
         "assignments": {
           "assignments": [
             {
-              "id": "406c6003-5e9d-455c-a201-f06de8e4c46c",
+              "id": "cf6de22d-0e1b-4332-ab50-08545a61578a",
               "name": "result",
               "value": "={{ $json.message }}",
               "type": "string"
@@ -387,7 +387,7 @@
         "includeOtherFields": false,
         "options": {}
       },
-      "id": "db57ac77-7920-4b71-be25-0c5e1fb22ff0",
+      "id": "b853c794-6c26-4237-b7be-612ef6d87d1d",
       "name": "Not Booked Result",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,

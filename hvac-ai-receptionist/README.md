@@ -11,6 +11,10 @@ Emergency check (gas, CO, smoke, sparks, flooding, "emergency")
                ├── HVAC_Knowledge_Base tool  → your existing HVAC RAG workflow
                ├── Book_Appointment tool     → hvac-booking-subworkflow.json
                └── decides: continue / transfer / end / emergency
+                             │
+                  transfer → picks department (service / sales / billing / manager)
+                           → staff hear a whisper: who is calling and why
+                           → caller is connected (no answer → callback promise + SMS)
         │
 Customer hears the reply → loop until goodbye or hang-up
         │
@@ -20,7 +24,7 @@ Google Sheets CRM (Calls, Call Log, Bookings) + staff SMS
 ## Files
 | File | What it is |
 |---|---|
-| `hvac-ai-receptionist.json` | Main call workflow (33 nodes) |
+| `hvac-ai-receptionist.json` | Main call workflow (36 nodes) |
 | `hvac-booking-subworkflow.json` | Booking tool: checks availability, saves booking, SMS customer and staff |
 | `sheets-templates/*.csv` | Header rows for the 3 Google Sheet tabs |
 
@@ -35,7 +39,8 @@ Google Sheets CRM (Calls, Call Log, Bookings) + staff SMS
    Workflow”) that has one input called `query`, and its last node should output the answer text.
    Copy its workflow ID.
 4. **Import the main workflow** (`hvac-ai-receptionist.json`).
-   - **Config & Parse Call**: set business name, timezone, transfer numbers, emergency numbers, staff SMS number, sheet ID.
+   - **Config & Parse Call**: set business name, timezone, `departments` (who the AI can transfer to, and their phone
+     numbers), emergency numbers, staff SMS number, sheet ID. Add or rename departments freely; the AI reads the list.
    - **HVAC_Knowledge_Base**: paste the RAG workflow ID. **Book_Appointment**: paste the booking workflow ID.
    - Add credentials: Anthropic (Claude Chat Model), Google Sheets (all CRM nodes), Twilio (SMS nodes).
      You can swap the Claude node for OpenAI or another chat model if you prefer.
@@ -44,6 +49,15 @@ Google Sheets CRM (Calls, Call Log, Bookings) + staff SMS
    - *A call comes in*: Webhook, `https://YOUR-N8N-DOMAIN/webhook/hvac-voice`, HTTP POST
    - *Call status changes*: `https://YOUR-N8N-DOMAIN/webhook/hvac-voice?stage=status`, HTTP POST
 6. Call your number and test: a question, a booking, “can I talk to a person”, and “I smell gas”.
+
+## How call transfer works
+- The caller says something like "can I talk to someone about my bill" → the AI replies "Sure, I'll connect you to
+  our billing team", sets `transfer_to: billing`, and Twilio dials the billing number(s).
+- Staff hear a short whisper first ("AI receptionist transfer for billing. Caller Ana. Question about a double charge"),
+  then the call connects. Turn it off with `whisperToStaff: false`.
+- Staff also get an SMS with the caller's number and summary, and the CRM row shows `TransferredTo`.
+- If nobody answers within 25 seconds, the caller is promised a callback, staff get a "MISSED" SMS, and the CRM
+  row is marked `CallbackNeeded = Yes`.
 
 ## How it works
 - Only one webhook is used. Twilio is sent back to it with `?stage=turn` (caller spoke),

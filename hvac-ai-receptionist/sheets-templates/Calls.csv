@@ -1,1 +1,1 @@
-CallSid,Phone,CustomerName,StartedAt,LastUpdated,Intent,Summary,Outcome,Emergency,TransferredToStaff,CallbackNeeded,CallStatus,DurationSec,LastCustomerMessage,LastAIReply
+CallSid,Phone,CustomerName,StartedAt,LastUpdated,Intent,Summary,Outcome,Emergency,TransferredToStaff,TransferredTo,CallbackNeeded,CallStatus,DurationSec,LastCustomerMessage,LastAIReply
