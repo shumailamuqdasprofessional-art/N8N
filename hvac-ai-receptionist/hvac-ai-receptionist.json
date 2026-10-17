@@ -1,0 +1,1604 @@
+{
+  "name": "HVAC AI Phone Receptionist (Twilio Voice)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## HVAC AI Phone Receptionist\n1. Edit settings in **Config & Parse Call**\n2. Twilio number \u2192 Voice \u2192 *A call comes in* \u2192 Webhook POST:\n`https://YOUR-N8N/webhook/hvac-voice`\n3. Twilio number \u2192 *Call status changes*:\n`https://YOUR-N8N/webhook/hvac-voice?stage=status`\n4. Set the workflow IDs in **HVAC_Knowledge_Base** and **Book_Appointment**\n5. Activate the workflow",
+        "height": 340,
+        "width": 420,
+        "color": 4
+      },
+      "id": "9f404af7-5d16-479c-8d79-d25383d469ce",
+      "name": "Note b532b8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hvac-voice",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a868f4c1-25fe-4902-a466-ee4190b9aacf",
+      "name": "Twilio Voice Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        300
+      ],
+      "webhookId": "95de2c77-4ee1-4b9d-95a6-d89fd4e93c23"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================= EDIT THESE SETTINGS =================\nconst config = {\n  businessName: 'Your HVAC Company',\n  timezone: 'America/New_York',\n  voice: 'Polly.Joanna-Neural',          // Twilio text-to-speech voice\n  language: 'en-US',\n  transferNumbers: ['+15555550100'],     // office / dispatch (all ring at once)\n  emergencyNumbers: ['+15555550199'],    // on-call emergency tech(s)\n  staffSmsNumber: '+15555550100',        // receives staff SMS alerts\n  sheetId: 'YOUR_GOOGLE_SHEET_ID',       // Google Sheets CRM file ID\n  callbackMinutes: 15,\n  smsEveryCallSummary: true,             // SMS staff a summary when the AI ends a call\n  speechHints: 'furnace, AC, air conditioner, heat pump, thermostat, carbon monoxide, gas leak, appointment, maintenance, tune-up, ductwork',\n};\n// =======================================================\n\nconst req = $input.first().json;\nconst body = req.body || {};\nconst query = req.query || {};\nconst speech = String(body.SpeechResult || '').trim();\n\n// Emergency check: runs on every caller sentence, before the AI.\nconst emergencyPatterns = [\n  { type: 'Gas leak', re: /\\b(gas (smell|leak)|smell(s|ing)? (of |like )?gas|rotten eggs?)\\b/i },\n  { type: 'Carbon monoxide', re: /\\b(carbon monoxide|monoxide|co (alarm|detector))\\b/i },\n  { type: 'Fire / smoke', re: /\\b(on fire|fire in|smoke|smoking|flames?|sparks?|sparking|burning smell|smells? (like )?burning)\\b/i },\n  { type: 'Electrical hazard', re: /\\b(exposed wires?|electrical (fire|burning)|got shocked|electrocut\\w*)\\b/i },\n  { type: 'Flooding', re: /\\b(flood(ing|ed)?|water everywhere|burst pipe)\\b/i },\n  { type: 'Emergency', re: /\\b(emergency|nine one one|911)\\b/i },\n];\nconst hit = speech ? emergencyPatterns.find((p) => p.re.test(speech)) : null;\n\nreturn [{\n  json: {\n    config,\n    stage: query.stage || 'incoming',\n    reason: query.reason || '',\n    callSid: body.CallSid || '',\n    from: body.From || '',\n    to: body.To || '',\n    speech,\n    confidence: Number(body.Confidence || 0),\n    callStatus: body.CallStatus || '',\n    duration: Number(body.CallDuration || 0),\n    dialStatus: body.DialCallStatus || '',\n    isEmergency: Boolean(hit),\n    emergencyType: hit ? hit.type : '',\n    timestamp: $now.setZone(config.timezone).toFormat('yyyy-LL-dd HH:mm:ss'),\n  },\n}];"
+      },
+      "id": "ab9b27b4-c97c-4acc-99de-e5b87dc5b19b",
+      "name": "Config & Parse Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3072c106-c857-46be-8a53-ff330d57ba8b",
+                    "leftValue": "={{ $json.stage }}",
+                    "rightValue": "incoming",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "incoming"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c34db1aa-72c4-4864-b0d5-5a058d772883",
+                    "leftValue": "={{ $json.stage }}",
+                    "rightValue": "turn",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "turn"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f6751dd2-d9d3-46c2-84da-0fb7c7967a98",
+                    "leftValue": "={{ $json.stage }}",
+                    "rightValue": "dial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "dial"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c07297a8-7997-4684-b730-fee76f8b0ab3",
+                    "leftValue": "={{ $json.stage }}",
+                    "rightValue": "status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "status"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1d6d5d8c-931e-4ed3-bfa7-a913c2eace2c",
+      "name": "Route by Call Stage",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -20,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 1. New call\nGreets the caller and creates the CRM row.",
+        "height": 120,
+        "width": 640,
+        "color": 7
+      },
+      "id": "f89d40e6-b5b8-4dad-9757-4494783b2c66",
+      "name": "Note 770793",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const call = $input.first().json;\nconst c = call.config;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\nconst greeting = `Thanks for calling ${c.businessName}. I'm the virtual assistant. ` +\n  `If you smell gas, have a carbon monoxide alarm going off, or see smoke, say emergency right away. ` +\n  `Otherwise, how can I help you today?`;\n\nreturn [{\n  json: {\n    ...call,\n    twiml: twiml(\n      gather(greeting) +\n      gather(\"Sorry, I didn't catch that. How can I help you today?\") +\n      say(`I didn't hear anything, so I'll end the call. Please call ${c.businessName} back anytime. Goodbye.`) +\n      '<Hangup/>'\n    ),\n  },\n}];"
+      },
+      "id": "a29c3562-df44-4a50-b96a-89db68b8ee93",
+      "name": "Greeting TwiML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.twiml }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b66a7d11-e26c-4f28-bae0-32e988a5c717",
+      "name": "Answer Call",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config & Parse Call').first().json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Calls"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CallSid": "={{ $json.callSid }}",
+            "Phone": "={{ $json.from }}",
+            "StartedAt": "={{ $json.timestamp }}",
+            "LastUpdated": "={{ $json.timestamp }}",
+            "Outcome": "In progress",
+            "CallStatus": "in-progress"
+          },
+          "matchingColumns": [
+            "CallSid"
+          ],
+          "schema": [
+            {
+              "id": "CallSid",
+              "displayName": "CallSid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "StartedAt",
+              "displayName": "StartedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LastUpdated",
+              "displayName": "LastUpdated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CallStatus",
+              "displayName": "CallStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "3c1c6bf1-9d2d-4e94-983b-ff6c992608e7",
+      "name": "CRM: New Call",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        700,
+        -100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### 2. Each thing the caller says\nEmergency keywords skip the AI and go straight to safety message + on-call transfer.\nEverything else goes to the AI receptionist (HVAC RAG + booking tools).",
+        "height": 140,
+        "width": 1700,
+        "color": 6
+      },
+      "id": "9ca35992-69a0-47bf-92df-7062f0842e02",
+      "name": "Note 611f8a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a2da74c0-64ee-4e60-ae69-0ba820bb1697",
+              "leftValue": "={{ $json.isEmergency }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c250989f-9b28-4dd3-9b47-2543295c9414",
+      "name": "Emergency Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const call = $input.first().json;\nreturn [{\n  json: {\n    ...call,\n    decision: {\n      action: 'emergency',\n      reply: '',\n      intent: 'emergency',\n      customer_name: '',\n      summary: `Emergency detected (${call.emergencyType}). Caller said: \"${call.speech}\"`,\n      callback_needed: true,\n    },\n  },\n}];"
+      },
+      "id": "1f1ab45c-1b9d-4541-8bf7-654c371e163a",
+      "name": "Emergency Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.speech }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are the friendly phone receptionist for {{ $('Config & Parse Call').first().json.config.businessName }}, a heating, ventilation and air conditioning (HVAC) company. You are talking to a caller on the PHONE. Everything you write in \"reply\" is read aloud by text-to-speech.\n\nRight now it is {{ $now.setZone($('Config & Parse Call').first().json.config.timezone).toFormat('cccc, LLLL d, yyyy, h:mm a') }}. The caller's phone number is {{ $('Config & Parse Call').first().json.from }}.\n\nVOICE RULES\n- Keep each reply short: 1 to 3 sentences, under 50 words.\n- Plain spoken English. No lists, bullet points, emojis, markdown or links.\n- Ask only one question at a time.\n- Say prices, dates and times the way a person says them out loud.\n\nWHAT YOU DO\n1. QUESTIONS: For services, pricing, hours, service area, maintenance plans, warranties and troubleshooting, ALWAYS use the HVAC_Knowledge_Base tool first. Never invent prices, policies or availability. If the knowledge base has no answer, say a team member will follow up and set callback_needed to true.\n2. BOOKING: Use the Book_Appointment tool. Before calling it, collect the caller's full name, service address, a short description of the problem, a preferred date and a time window. Time windows are 8am-10am, 10am-12pm, 12pm-2pm, 2pm-4pm and 4pm-6pm. Turn words like \"tomorrow\" or \"next Tuesday\" into a YYYY-MM-DD date using today's date. Read the details back and get a yes before booking. If the tool says the window is full, offer the free windows it returns.\n3. HUMAN TRANSFER (action \"transfer\"): when the caller asks for a person, is upset, has a billing dispute or complaint, asks about an existing job you cannot look up, or you could not understand them twice.\n4. EMERGENCY (action \"emergency\"): gas smell, carbon monoxide alarm, smoke, burning smell, sparks, water flooding from equipment, or no heat in freezing weather with elderly people, babies or someone medically vulnerable in the home.\n5. END (action \"end\"): only when the caller says goodbye or confirms they need nothing else. Give a warm goodbye in reply.\nOtherwise use action \"continue\".\n\nOUTPUT: respond with JSON only, with these fields:\n- action: \"continue\", \"transfer\", \"end\" or \"emergency\"\n- reply: exactly what to say to the caller now\n- intent: question, booking, troubleshooting, pricing, transfer_request, complaint, emergency or other\n- customer_name: the caller's name once known (repeat it on every turn after that), otherwise empty\n- summary: one sentence summarizing the whole call so far, for staff\n- callback_needed: true if staff must call the customer back, otherwise false",
+          "maxIterations": 6
+        }
+      },
+      "id": "0f5b050c-9c9a-4d31-8cc4-d257ae9ec813",
+      "name": "AI Receptionist",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        520,
+        520
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 400,
+          "temperature": 0.3
+        }
+      },
+      "id": "7e6da77a-025c-4485-be46-35789aa8d60d",
+      "name": "Claude Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        300,
+        760
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Config & Parse Call').first().json.callSid }}",
+        "contextWindowLength": 20
+      },
+      "id": "0cc59a90-970b-43ab-b490-16c4e4643834",
+      "name": "Call Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Search the company's HVAC knowledge base (existing HVAC RAG). Use for any question about services, pricing, hours, service area, maintenance plans, warranties, equipment and troubleshooting. Input a clear search question.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_EXISTING_HVAC_RAG_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query": "={{ $fromAI('query', 'The caller question as a clear search query', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "0abac70d-b591-4fb6-b79e-d0de2ffa2e54",
+      "name": "HVAC_Knowledge_Base",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        580,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Book an HVAC service appointment. Only call after the caller confirmed name, address, issue, date and time window. Returns whether it was booked, or which windows are still free.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_BOOKING_WORKFLOW_ID"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_name": "={{ $fromAI('customer_name', 'Caller full name', 'string') }}",
+            "service_address": "={{ $fromAI('service_address', 'Full service address', 'string') }}",
+            "issue": "={{ $fromAI('issue', 'Short description of the HVAC problem or service needed', 'string') }}",
+            "preferred_date": "={{ $fromAI('preferred_date', 'Appointment date in YYYY-MM-DD format', 'string') }}",
+            "time_window": "={{ $fromAI('time_window', 'One of: 8am-10am, 10am-12pm, 12pm-2pm, 2pm-4pm, 4pm-6pm', 'string') }}",
+            "caller_phone": "={{ $('Config & Parse Call').first().json.from }}",
+            "twilio_number": "={{ $('Config & Parse Call').first().json.to }}",
+            "call_sid": "={{ $('Config & Parse Call').first().json.callSid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service_address",
+              "displayName": "service_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "issue",
+              "displayName": "issue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "preferred_date",
+              "displayName": "preferred_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "time_window",
+              "displayName": "time_window",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_phone",
+              "displayName": "caller_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "twilio_number",
+              "displayName": "twilio_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "call_sid",
+              "displayName": "call_sid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "92808945-97c2-4b51-94d2-f6d146432a7f",
+      "name": "Book_Appointment",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        720,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"action\": \"continue\",\n  \"reply\": \"Sure, I can get a technician out to look at your AC. Can I get your full name?\",\n  \"intent\": \"booking\",\n  \"customer_name\": \"\",\n  \"summary\": \"Caller's AC is blowing warm air and they want a repair visit.\",\n  \"callback_needed\": false\n}"
+      },
+      "id": "f47ca980-c69b-46f8-ba21-a488be42dc87",
+      "name": "AI Reply Format",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const call = $('Config & Parse Call').first().json;\nconst raw = $input.first().json;\nlet out = raw.output;\n\nif (typeof out === 'string') {\n  try {\n    out = JSON.parse(out.replace(/```(json)?/g, '').trim());\n  } catch (e) {\n    out = { action: 'continue', reply: out };\n  }\n}\n\n// AI failed or timed out: never leave the caller in silence, hand them to a person.\nif (!out || typeof out !== 'object' || raw.error) {\n  out = {\n    action: 'transfer',\n    reply: \"I'm sorry, I'm having a little trouble on my end. Let me connect you with someone from our team.\",\n    intent: 'system_error',\n    summary: 'AI error: ' + (raw.error?.message || raw.error || 'no output'),\n    callback_needed: true,\n  };\n}\n\nconst allowed = ['continue', 'transfer', 'end', 'emergency'];\nlet action = String(out.action || 'continue').toLowerCase().trim();\nif (!allowed.includes(action)) action = 'continue';\n\nconst decision = {\n  action,\n  reply: String(out.reply || '').trim(),\n  intent: String(out.intent || 'other'),\n  customer_name: String(out.customer_name || ''),\n  summary: String(out.summary || ''),\n  callback_needed: out.callback_needed === true || out.callback_needed === 'true',\n};\nif (action === 'continue' && !decision.reply) decision.reply = 'Sorry, could you say that one more time?';\n\nreturn [{ json: { ...call, decision } }];"
+      },
+      "id": "56e093d6-7bd3-42ec-a3cb-10f8fe547381",
+      "name": "Parse AI Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst c = item.config;\nconst d = item.decision;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\nconst numbers = (list) => list.map((n) => `<Number>${esc(n)}</Number>`).join('');\n\nconst SAFETY =\n  'For your safety: if you smell gas, leave the building now. Do not use light switches, ' +\n  'appliances, or open flames, and call 911 or your gas company once you are outside. ' +\n  'If a carbon monoxide alarm is sounding, get everyone into fresh air and call 911.';\n\nlet inner = '';\nlet outcome = 'In conversation';\nswitch (d.action) {\n  case 'emergency':\n    inner = say(SAFETY) +\n      say('I am connecting you to our emergency technician now. Please stay on the line.') +\n      `<Dial timeout=\"30\" action=\"hvac-voice?stage=dial&amp;reason=emergency\" method=\"POST\">${numbers(c.emergencyNumbers)}</Dial>`;\n    outcome = 'EMERGENCY - transferred to on-call';\n    break;\n  case 'transfer':\n    inner = say(d.reply || 'Let me connect you with a member of our team. One moment please.') +\n      `<Dial timeout=\"25\" action=\"hvac-voice?stage=dial&amp;reason=transfer\" method=\"POST\">${numbers(c.transferNumbers)}</Dial>`;\n    outcome = 'Transferred to staff';\n    break;\n  case 'end':\n    inner = say(d.reply || `Thanks for calling ${c.businessName}. Have a great day. Goodbye.`) + '<Hangup/>';\n    outcome = 'Completed by AI';\n    break;\n  default:\n    inner = gather(d.reply) +\n      gather('Are you still there? How else can I help?') +\n      say(`I didn't hear anything, so I'll end the call. Please call ${c.businessName} back anytime. Goodbye.`) +\n      '<Hangup/>';\n}\n\n// Staff SMS text\nconst who = d.customer_name ? `${d.customer_name} (${item.from})` : item.from;\nlet notifyStaff = false;\nlet smsText = '';\nif (d.action === 'emergency') {\n  notifyStaff = true;\n  smsText = `EMERGENCY call from ${who}. Type: ${item.emergencyType || 'reported by caller'}. ` +\n    `Caller said: \"${item.speech}\". Connecting to on-call now.`;\n} else if (d.action === 'transfer') {\n  notifyStaff = true;\n  smsText = `Transfer: ${who} is being connected to staff. ${d.summary}`;\n} else if (d.action === 'end' && (c.smsEveryCallSummary || d.callback_needed)) {\n  notifyStaff = true;\n  smsText = `Call finished: ${who}. ${d.summary}` + (d.callback_needed ? ' CALLBACK NEEDED.' : '');\n}\n\nreturn [{\n  json: {\n    ...item,\n    twiml: twiml(inner),\n    outcome,\n    notifyStaff,\n    smsText: smsText.slice(0, 600),\n  },\n}];"
+      },
+      "id": "b3fc9242-7ddf-4ceb-a068-2d841c6fe93c",
+      "name": "Build TwiML Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.twiml }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c288e658-5135-4c51-8a3b-5430e4da463b",
+      "name": "Speak to Caller",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config & Parse Call').first().json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Call Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "CallSid": "={{ $json.callSid }}",
+            "Phone": "={{ $json.from }}",
+            "CustomerSaid": "={{ $json.speech }}",
+            "AIReply": "={{ $json.decision.reply }}",
+            "Action": "={{ $json.decision.action }}",
+            "Intent": "={{ $json.decision.intent }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CallSid",
+              "displayName": "CallSid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CustomerSaid",
+              "displayName": "CustomerSaid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AIReply",
+              "displayName": "AIReply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Action",
+              "displayName": "Action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "342bc9b9-efcb-4c86-9900-2330326afe06",
+      "name": "CRM: Log Turn",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1560,
+        260
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config & Parse Call').first().json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Calls"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CallSid": "={{ $json.callSid }}",
+            "Phone": "={{ $json.from }}",
+            "CustomerName": "={{ $json.decision.customer_name }}",
+            "LastUpdated": "={{ $json.timestamp }}",
+            "Intent": "={{ $json.decision.intent }}",
+            "Summary": "={{ $json.decision.summary }}",
+            "Outcome": "={{ $json.outcome }}",
+            "Emergency": "={{ $json.decision.action === 'emergency' ? 'YES - ' + ($json.emergencyType || 'AI detected') : 'No' }}",
+            "TransferredToStaff": "={{ ['transfer','emergency'].includes($json.decision.action) ? 'Yes' : 'No' }}",
+            "CallbackNeeded": "={{ $json.decision.callback_needed ? 'Yes' : 'No' }}",
+            "LastCustomerMessage": "={{ $json.speech }}",
+            "LastAIReply": "={{ $json.decision.reply }}"
+          },
+          "matchingColumns": [
+            "CallSid"
+          ],
+          "schema": [
+            {
+              "id": "CallSid",
+              "displayName": "CallSid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CustomerName",
+              "displayName": "CustomerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LastUpdated",
+              "displayName": "LastUpdated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Emergency",
+              "displayName": "Emergency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TransferredToStaff",
+              "displayName": "TransferredToStaff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CallbackNeeded",
+              "displayName": "CallbackNeeded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LastCustomerMessage",
+              "displayName": "LastCustomerMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LastAIReply",
+              "displayName": "LastAIReply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "37141822-d906-479c-a7ac-bb419da2ced6",
+      "name": "CRM: Update Call",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1560,
+        420
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "99b7b516-a6bf-40d1-8a05-00862d19168e",
+              "leftValue": "={{ $json.notifyStaff }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "175cc93e-ff7c-49b3-9e91-1241827ee48d",
+      "name": "Notify Staff?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "from": "={{ $json.to }}",
+        "to": "={{ $json.config.staffSmsNumber }}",
+        "message": "={{ $json.smsText }}",
+        "options": {}
+      },
+      "id": "87efb06d-3f33-4f96-9a0a-01eb9d9b0092",
+      "name": "Staff SMS Alert",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        560
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### 3. After a transfer\nIf nobody answered: tell caller we'll call back, SMS staff, flag CRM.",
+        "height": 120,
+        "width": 1100,
+        "color": 3
+      },
+      "id": "98fe6841-05a7-4dd2-86f5-2fb1fd91432f",
+      "name": "Note a09869",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const call = $input.first().json;\nconst c = call.config;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\nconst answered = call.dialStatus === 'completed' || call.dialStatus === 'answered';\nconst isEmergency = call.reason === 'emergency';\n\nlet inner;\nif (answered) {\n  inner = '<Hangup/>';\n} else if (isEmergency) {\n  inner = say(\n    `I couldn't reach our on-call technician, but they have been alerted and will call you back within ${c.callbackMinutes} minutes. ` +\n    'If anyone is in danger, hang up and call 911 now. Goodbye.') + '<Hangup/>';\n} else {\n  inner = say(\n    `Sorry, our team couldn't pick up right now. I've sent them your number and someone will call you back within ${c.callbackMinutes} minutes. ` +\n    `Thanks for calling ${c.businessName}. Goodbye.`) + '<Hangup/>';\n}\n\nreturn [{\n  json: {\n    ...call,\n    twiml: twiml(inner),\n    missed: !answered,\n    smsText: `MISSED ${isEmergency ? 'EMERGENCY ' : ''}transfer from ${call.from} (status: ${call.dialStatus || 'unknown'}). ` +\n      `Please call back within ${c.callbackMinutes} minutes.`,\n  },\n}];"
+      },
+      "id": "40d6744b-48f1-4165-b7e4-edcd1deafb15",
+      "name": "Transfer Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.twiml }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "d0c7ce27-df3c-4690-add3-b9e590eb4e14",
+      "name": "Finish Transfer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d380f8f9-4ecf-4941-995a-4771327b4005",
+              "leftValue": "={{ $json.missed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "60b6ea25-613c-4bda-aa85-de0694545334",
+      "name": "Nobody Answered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "from": "={{ $json.to }}",
+        "to": "={{ $json.config.staffSmsNumber }}",
+        "message": "={{ $json.smsText }}",
+        "options": {}
+      },
+      "id": "7f2cd9a0-11ae-493e-a3bd-9ec4cf91d115",
+      "name": "Missed Transfer SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        920,
+        1040
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config & Parse Call').first().json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Calls"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CallSid": "={{ $('Transfer Result').first().json.callSid }}",
+            "LastUpdated": "={{ $('Transfer Result').first().json.timestamp }}",
+            "Outcome": "={{ 'Missed ' + ($('Transfer Result').first().json.reason || 'transfer') + ' - callback needed' }}",
+            "CallbackNeeded": "Yes"
+          },
+          "matchingColumns": [
+            "CallSid"
+          ],
+          "schema": [
+            {
+              "id": "CallSid",
+              "displayName": "CallSid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LastUpdated",
+              "displayName": "LastUpdated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outcome",
+              "displayName": "Outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CallbackNeeded",
+              "displayName": "CallbackNeeded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "2e0b6e4e-145d-4e82-bc85-513190834367",
+      "name": "CRM: Callback Needed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        920,
+        1200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "### 4. Call ended (Twilio status callback)\nSaves final status + duration.",
+        "height": 120,
+        "width": 700,
+        "color": 5
+      },
+      "id": "7d3eefd7-d862-47ca-b0ca-85cf8602610c",
+      "name": "Note ffa282",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        200,
+        1340
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f0328489-3807-415a-9416-00123b6ee6ff",
+      "name": "Acknowledge Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config & Parse Call').first().json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Calls"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CallSid": "={{ $json.callSid }}",
+            "Phone": "={{ $json.from }}",
+            "LastUpdated": "={{ $json.timestamp }}",
+            "CallStatus": "={{ $json.callStatus }}",
+            "DurationSec": "={{ $json.duration }}"
+          },
+          "matchingColumns": [
+            "CallSid"
+          ],
+          "schema": [
+            {
+              "id": "CallSid",
+              "displayName": "CallSid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LastUpdated",
+              "displayName": "LastUpdated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CallStatus",
+              "displayName": "CallStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DurationSec",
+              "displayName": "DurationSec",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "fe2dfc53-40c5-4183-9caf-f42c5cbf44ea",
+      "name": "CRM: Call Ended",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        1500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Twilio Voice Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config & Parse Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config & Parse Call": {
+      "main": [
+        [
+          {
+            "node": "Route by Call Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Call Stage": {
+      "main": [
+        [
+          {
+            "node": "Greeting TwiML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Emergency Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Transfer Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acknowledge Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Greeting TwiML": {
+      "main": [
+        [
+          {
+            "node": "Answer Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Call": {
+      "main": [
+        [
+          {
+            "node": "CRM: New Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency Check": {
+      "main": [
+        [
+          {
+            "node": "Emergency Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HVAC_Knowledge_Base": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book_Appointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Reply Format": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Receptionist",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Receptionist": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency Decision": {
+      "main": [
+        [
+          {
+            "node": "Build TwiML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Decision": {
+      "main": [
+        [
+          {
+            "node": "Build TwiML Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build TwiML Response": {
+      "main": [
+        [
+          {
+            "node": "Speak to Caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Speak to Caller": {
+      "main": [
+        [
+          {
+            "node": "CRM: Log Turn",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CRM: Update Call",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Staff?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Staff?": {
+      "main": [
+        [
+          {
+            "node": "Staff SMS Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transfer Result": {
+      "main": [
+        [
+          {
+            "node": "Finish Transfer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish Transfer": {
+      "main": [
+        [
+          {
+            "node": "Nobody Answered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nobody Answered?": {
+      "main": [
+        [
+          {
+            "node": "Missed Transfer SMS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CRM: Callback Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge Status": {
+      "main": [
+        [
+          {
+            "node": "CRM: Call Ended",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}

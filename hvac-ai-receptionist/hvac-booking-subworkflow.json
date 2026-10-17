@@ -1,0 +1,502 @@
+{
+  "name": "HVAC Booking (AI tool)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## HVAC Booking (sub-workflow)\nCalled by the AI receptionist's **Book_Appointment** tool.\nEdit settings in **Booking Settings & Validate**. Bookings go to the **Bookings** sheet tab.\nCopy this workflow's ID into the main workflow.",
+        "height": 220,
+        "width": 420,
+        "color": 4
+      },
+      "id": "67baca5b-196e-4734-8ab1-81a6d31b5194",
+      "name": "Note 6b5008",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_name"
+            },
+            {
+              "name": "service_address"
+            },
+            {
+              "name": "issue"
+            },
+            {
+              "name": "preferred_date"
+            },
+            {
+              "name": "time_window"
+            },
+            {
+              "name": "caller_phone"
+            },
+            {
+              "name": "twilio_number"
+            },
+            {
+              "name": "call_sid"
+            }
+          ]
+        }
+      },
+      "id": "a6b32b74-b2dc-4a2f-be61-fb6e1c61364a",
+      "name": "When Called by AI Receptionist",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================= EDIT THESE SETTINGS =================\nconst config = {\n  businessName: 'Your HVAC Company',\n  timezone: 'America/New_York',\n  sheetId: 'YOUR_GOOGLE_SHEET_ID',      // same file as the call CRM\n  staffSmsNumber: '+15555550100',\n  maxJobsPerWindow: 2,                  // how many technicians per time window\n  closedWeekdays: [7],                  // 1 = Monday ... 7 = Sunday\n};\nconst slots = ['8am-10am', '10am-12pm', '12pm-2pm', '2pm-4pm', '4pm-6pm'];\n// =======================================================\n\nconst i = $input.first().json;\nconst norm = (s) => String(s || '').toLowerCase().replace(/\\s+|:00|\\./g, '').replace(/\u2013|\u2014|to/g, '-');\nconst timeWindow = slots.find((s) => norm(s) === norm(i.time_window)) || String(i.time_window || '');\n\nconst date = DateTime.fromISO(String(i.preferred_date || '').trim(), { zone: config.timezone });\nconst today = $now.setZone(config.timezone).startOf('day');\nlet problem = '';\nif (!date.isValid) problem = 'The date was not understood. Ask the caller for the date again.';\nelse if (date < today) problem = 'That date is in the past. Ask for a future date.';\nelse if (config.closedWeekdays.includes(date.weekday)) problem = `We are closed on ${date.toFormat('cccc')}s. Ask for another day.`;\nelse if (!slots.includes(timeWindow)) problem = `Time window must be one of: ${slots.join(', ')}.`;\n\nreturn [{\n  json: {\n    config, slots, problem,\n    customerName: String(i.customer_name || '').trim(),\n    phone: i.caller_phone || '',\n    twilioNumber: i.twilio_number || '',\n    callSid: i.call_sid || '',\n    address: String(i.service_address || '').trim(),\n    issue: String(i.issue || '').trim(),\n    date: date.isValid ? date.toISODate() : '',\n    dateSpoken: date.isValid ? date.toFormat('cccc, LLLL d') : '',\n    timeWindow,\n    bookingId: 'HV-' + $now.toFormat('yyMMdd') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),\n    createdAt: $now.setZone(config.timezone).toFormat('yyyy-LL-dd HH:mm:ss'),\n  },\n}];"
+      },
+      "id": "3343d240-090f-412d-a916-faebb054c75a",
+      "name": "Booking Settings & Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "options": {},
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Date",
+              "lookupValue": "={{ $json.date || 'none' }}"
+            }
+          ]
+        }
+      },
+      "id": "c5a8b4b4-f75e-46d3-a8a9-2a55e772891e",
+      "name": "Get Bookings That Day",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        60,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Booking Settings & Validate').first().json;\nconst rows = $input.all().map((x) => x.json).filter((r) => r && r.Date);\nconst booked = (w) => rows.filter((r) =>\n  String(r.Date) === b.date && String(r.TimeWindow) === w &&\n  String(r.Status || '').toLowerCase() !== 'cancelled').length;\n\nconst freeWindows = b.slots.filter((w) => booked(w) < b.config.maxJobsPerWindow);\nconst available = !b.problem && freeWindows.includes(b.timeWindow);\n\nlet message = '';\nif (b.problem) message = 'NOT BOOKED. ' + b.problem;\nelse if (!available) message = freeWindows.length\n  ? `NOT BOOKED. The ${b.timeWindow} window on ${b.dateSpoken} is full. Free windows that day: ${freeWindows.join(', ')}.`\n  : `NOT BOOKED. ${b.dateSpoken} is fully booked. Ask the caller for another day.`;\n\nreturn [{ json: { ...b, available, freeWindows, message } }];"
+      },
+      "id": "11becd12-7855-46ec-9d3b-37ef286299ad",
+      "name": "Check Availability",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "582c1445-a1aa-4ea6-8c88-7617d6251b68",
+              "leftValue": "={{ $json.available }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a5a57552-674f-4c46-b4a3-80c0238a5f8d",
+      "name": "Slot Free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.config.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Bookings"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "BookingID": "={{ $json.bookingId }}",
+            "CreatedAt": "={{ $json.createdAt }}",
+            "Date": "={{ $json.date }}",
+            "TimeWindow": "={{ $json.timeWindow }}",
+            "CustomerName": "={{ $json.customerName }}",
+            "Phone": "={{ $json.phone }}",
+            "Address": "={{ $json.address }}",
+            "Issue": "={{ $json.issue }}",
+            "Status": "Scheduled",
+            "CallSid": "={{ $json.callSid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "BookingID",
+              "displayName": "BookingID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CreatedAt",
+              "displayName": "CreatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TimeWindow",
+              "displayName": "TimeWindow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CustomerName",
+              "displayName": "CustomerName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Address",
+              "displayName": "Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Issue",
+              "displayName": "Issue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CallSid",
+              "displayName": "CallSid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "9c8ab0e1-007e-43fe-b6a2-1c60f1c16bc4",
+      "name": "Save Booking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "from": "={{ $('Booking Settings & Validate').first().json.twilioNumber }}",
+        "to": "={{ $('Booking Settings & Validate').first().json.phone }}",
+        "message": "=Hi {{ $('Booking Settings & Validate').first().json.customerName }}, your {{ $('Booking Settings & Validate').first().json.config.businessName }} appointment is booked for {{ $('Booking Settings & Validate').first().json.dateSpoken }}, {{ $('Booking Settings & Validate').first().json.timeWindow }} at {{ $('Booking Settings & Validate').first().json.address }}. Booking ID {{ $('Booking Settings & Validate').first().json.bookingId }}. Call us to make changes.",
+        "options": {}
+      },
+      "id": "6d351bb9-2040-4461-9191-ee162bcbba77",
+      "name": "Customer Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        940,
+        100
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "from": "={{ $('Booking Settings & Validate').first().json.twilioNumber }}",
+        "to": "={{ $('Booking Settings & Validate').first().json.config.staffSmsNumber }}",
+        "message": "=New booking {{ $('Booking Settings & Validate').first().json.bookingId }}: {{ $('Booking Settings & Validate').first().json.customerName }} ({{ $('Booking Settings & Validate').first().json.phone }}), {{ $('Booking Settings & Validate').first().json.dateSpoken }} {{ $('Booking Settings & Validate').first().json.timeWindow }}, {{ $('Booking Settings & Validate').first().json.address }}. Issue: {{ $('Booking Settings & Validate').first().json.issue }}",
+        "options": {}
+      },
+      "id": "a6e4cda7-1136-42e4-9959-03dbc2308c6d",
+      "name": "Staff New Booking SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        100
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1ae9727f-6717-4753-abdb-a93d6f546c14",
+              "name": "result",
+              "value": "=BOOKED. Booking ID {{ $('Booking Settings & Validate').first().json.bookingId }} for {{ $('Booking Settings & Validate').first().json.customerName }} on {{ $('Booking Settings & Validate').first().json.dateSpoken }}, {{ $('Booking Settings & Validate').first().json.timeWindow }}. A confirmation text was sent to the caller.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "f10ec040-74a4-48fa-abce-c371d999788e",
+      "name": "Booked Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1380,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "406c6003-5e9d-455c-a201-f06de8e4c46c",
+              "name": "result",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "db57ac77-7920-4b71-be25-0c5e1fb22ff0",
+      "name": "Not Booked Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "When Called by AI Receptionist": {
+      "main": [
+        [
+          {
+            "node": "Booking Settings & Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Settings & Validate": {
+      "main": [
+        [
+          {
+            "node": "Get Bookings That Day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bookings That Day": {
+      "main": [
+        [
+          {
+            "node": "Check Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Availability": {
+      "main": [
+        [
+          {
+            "node": "Slot Free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Free?": {
+      "main": [
+        [
+          {
+            "node": "Save Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Booked Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Booking": {
+      "main": [
+        [
+          {
+            "node": "Customer Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Confirmation SMS": {
+      "main": [
+        [
+          {
+            "node": "Staff New Booking SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Staff New Booking SMS": {
+      "main": [
+        [
+          {
+            "node": "Booked Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
