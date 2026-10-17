@@ -1,0 +1,168 @@
+{
+  "name": "Twilio - Dialer (Web Form Link)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "dialer",
+        "formTitle": "Call Dialer",
+        "formDescription": "Paste phone numbers (one per line, e.g. +15551234567 or John, +15551234567). Each person is called one by one, 30 seconds apart.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Phone numbers",
+              "fieldType": "textarea",
+              "placeholder": "John, +15551234567\n+15559876543",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Message to say",
+              "fieldType": "textarea",
+              "placeholder": "Hello, this is a call from our team."
+            },
+            {
+              "fieldLabel": "Your phone (answered calls connect here)",
+              "placeholder": "+15550001111"
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Dialing started! Check Executions in n8n to see progress."
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-005-4000-8000-000000000001",
+      "name": "Dialer Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "a1b2c3d4-005-4000-8000-000000000098"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns the pasted list into one call per number\nconst toE164 = (value) => {\n  const text = String(value || '').trim();\n  const digits = text.replace(/\\D/g, '');\n  if (text.startsWith('+') && digits.length >= 8) return '+' + digits;\n  if (digits.length === 10) return '+1' + digits;\n  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;\n  return null;\n};\nconst escapeXml = (s) => String(s).replace(/[<>&'\"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', \"'\": '&apos;', '\"': '&quot;' }[c]));\n\nconst form = $input.first().json;\nconst message = String(form['Message to say'] || '').trim() || 'Hello, this is a call from our team.';\nconst agentPhone = toE164(form['Your phone (answered calls connect here)']);\n\nconst seen = new Set();\nconst calls = [];\nfor (const line of String(form['Phone numbers'] || '').split(/\\r?\\n/)) {\n  if (!line.trim()) continue;\n  // Each line: \"+15551234567\" or \"John, +15551234567\"\n  const parts = line.split(',');\n  const phone = toE164(parts[parts.length - 1]);\n  const name = parts.length > 1 ? parts.slice(0, -1).join(',').trim() : '';\n  if (!phone || seen.has(phone)) continue;\n  seen.add(phone);\n\n  const greeting = name ? `Hello ${name}. ${message}` : message;\n  let twiml = `<Response><Say>${escapeXml(greeting)}</Say>`;\n  if (agentPhone) twiml += `<Dial>${agentPhone}</Dial>`;\n  twiml += '</Response>';\n  calls.push({ json: { name, phone, twiml } });\n}\n\nif (calls.length === 0) throw new Error('No valid phone numbers found. Use +country code, e.g. +15551234567');\nreturn calls;\n"
+      },
+      "id": "a1b2c3d4-005-4000-8000-000000000002",
+      "name": "Build Call List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1b2c3d4-005-4000-8000-000000000003",
+      "name": "One At A Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "call",
+        "from": "+10000000000",
+        "to": "={{ $json.phone }}",
+        "twiml": true,
+        "message": "={{ $json.twiml }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-005-4000-8000-000000000004",
+      "name": "Make Call",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        680,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "a1b2c3d4-005-4000-8000-000000000005",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        80
+      ],
+      "webhookId": "a1b2c3d4-005-4000-8000-000000000099"
+    }
+  ],
+  "connections": {
+    "Dialer Form": {
+      "main": [
+        [
+          {
+            "node": "Build Call List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Call List": {
+      "main": [
+        [
+          {
+            "node": "One At A Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One At A Time": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Make Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Call": {
+      "main": [
+        [
+          {
+            "node": "Wait 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30s": {
+      "main": [
+        [
+          {
+            "node": "One At A Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

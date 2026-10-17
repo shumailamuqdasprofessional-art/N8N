@@ -43,7 +43,7 @@
       "position": [680, 80]
     },
     {
-      "parameters": { "amount": 30 },
+      "parameters": { "amount": 30, "unit": "seconds" },
       "id": "a1b2c3d4-0003-4000-8000-000000000005",
       "name": "Wait 30s",
       "type": "n8n-nodes-base.wait",

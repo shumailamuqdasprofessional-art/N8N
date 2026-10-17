@@ -47,11 +47,21 @@ Set `PUBLIC_URL` to your app's public address, or the check will fail behind the
 | `2-sms-auto-reply.json` | Auto-replies to every incoming SMS / WhatsApp | app.js → `/webhook/twilio-sms` |
 | `3-call-dialer.json` | Calls a list of numbers one by one (30s gap) | Click **Execute workflow** |
 | `4-call-and-status-log.json` | Cleans up incoming call and status data for logging | app.js → `/webhook/twilio-events` |
+| `5-dialer-web-form.json` | **Dialer with a link**: open the page, paste numbers, click Submit | Open `https://YOUR-N8N/form/dialer` |
+| `6-dialer-google-sheet.json` | **Dialer from Google Sheet**: calls every row without a Status, then writes "Called" | Click **Execute workflow** |
 
 3. In each **Twilio** node: choose your Twilio credential and replace `+10000000000` with your Twilio number.
 4. In **3-call-dialer**: edit the **Call List** node with your numbers, and replace `+10000000009` with the phone that should take the call. You can swap the Call List for a Google Sheets node.
 5. In **4-call-and-status-log**: add a Google Sheets, Airtable, or email node after **Format Log** to save the records.
-6. **Activate** the workflows. Copy each webhook's **Production URL** into the matching `N8N_TWILIO_*` variable.
+6. **Dialer with a link (5)**: in **Make Call**, set your Twilio number, then **Activate**.
+   Open `https://YOUR-N8N/form/dialer`, paste one number per line (`+15551234567` or `John, +15551234567`),
+   type the message, add your phone (answered calls ring it), and click **Submit**.
+7. **Google Sheet dialer (6)**: create a sheet (https://sheets.new) and import `workflows/dialer-sheet-template.csv`
+   (File → Import → Upload), or just add the headers `Name, Phone, Message, Status, Called At`.
+   Format the **Phone** column as **Plain text** (Format → Number → Plain text) so the `+` isn't removed.
+   In n8n: **Credentials → New → Google Sheets OAuth2**, then in both sheet nodes pick it and paste your sheet link.
+   In **Build Call List**, set `AGENT_PHONE` (your phone). Click **Execute workflow** to start.
+8. **Activate** the workflows. Copy each webhook's **Production URL** into the matching `N8N_TWILIO_*` variable.
 
 ## Rules (important)
 

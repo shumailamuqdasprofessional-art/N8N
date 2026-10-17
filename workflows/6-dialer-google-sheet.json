@@ -1,0 +1,245 @@
+{
+  "name": "Twilio - Dialer (Google Sheet)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-006-4000-8000-000000000001",
+      "name": "Start Dialing",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_LINK_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-006-4000-8000-000000000002",
+      "name": "Read Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== EDIT THESE TWO LINES =====\nconst AGENT_PHONE = '+10000000009'; // your phone: answered calls connect here ('' = just play the message)\nconst DEFAULT_MESSAGE = 'Hello, this is a call from our team.';\n// ================================\n\nconst toE164 = (value) => {\n  const text = String(value || '').trim();\n  const digits = text.replace(/\\D/g, '');\n  if (text.startsWith('+') && digits.length >= 8) return '+' + digits;\n  if (digits.length === 10) return '+1' + digits;\n  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;\n  return null;\n};\nconst escapeXml = (s) => String(s).replace(/[<>&'\"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', \"'\": '&apos;', '\"': '&quot;' }[c]));\n\nconst calls = [];\nfor (const item of $input.all()) {\n  const row = item.json;\n  if (String(row.Status || '').trim()) continue; // already called\n  const phone = toE164(row.Phone);\n  if (!phone) continue;\n\n  const name = String(row.Name || '').trim();\n  const message = String(row.Message || '').trim() || DEFAULT_MESSAGE;\n  const greeting = name ? `Hello ${name}. ${message}` : message;\n  let twiml = `<Response><Say>${escapeXml(greeting)}</Say>`;\n  if (AGENT_PHONE) twiml += `<Dial>${AGENT_PHONE}</Dial>`;\n  twiml += '</Response>';\n  calls.push({ json: { name, phone, sheetPhone: row.Phone, twiml } });\n}\nreturn calls;\n"
+      },
+      "id": "a1b2c3d4-006-4000-8000-000000000003",
+      "name": "Build Call List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1b2c3d4-006-4000-8000-000000000004",
+      "name": "One At A Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "call",
+        "from": "+10000000000",
+        "to": "={{ $json.phone }}",
+        "twiml": true,
+        "message": "={{ $json.twiml }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-006-4000-8000-000000000005",
+      "name": "Make Call",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        900,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_LINK_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Phone": "={{ $('One At A Time').item.json.sheetPhone }}",
+            "Status": "Called",
+            "Called At": "={{ $now.toFormat(\"yyyy-MM-dd HH:mm\") }}"
+          },
+          "matchingColumns": [
+            "Phone"
+          ],
+          "schema": [
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Called At",
+              "displayName": "Called At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-006-4000-8000-000000000006",
+      "name": "Mark As Called",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "a1b2c3d4-006-4000-8000-000000000007",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        80
+      ],
+      "webhookId": "a1b2c3d4-006-4000-8000-000000000099"
+    }
+  ],
+  "connections": {
+    "Start Dialing": {
+      "main": [
+        [
+          {
+            "node": "Read Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sheet": {
+      "main": [
+        [
+          {
+            "node": "Build Call List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Call List": {
+      "main": [
+        [
+          {
+            "node": "One At A Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One At A Time": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Make Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Call": {
+      "main": [
+        [
+          {
+            "node": "Mark As Called",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark As Called": {
+      "main": [
+        [
+          {
+            "node": "Wait 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30s": {
+      "main": [
+        [
+          {
+            "node": "One At A Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
