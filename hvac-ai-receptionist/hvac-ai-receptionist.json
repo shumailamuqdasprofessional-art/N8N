@@ -8,8 +8,8 @@
         "width": 420,
         "color": 4
       },
-      "id": "deccdd3b-03f6-4029-bd50-008c8c4ab392",
-      "name": "Note 8f897f",
+      "id": "f598173f-17ac-4aa6-94e2-9b2e9349459e",
+      "name": "Note e7a525",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -24,7 +24,7 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "e00a723b-d786-439c-9dc3-318babe8d717",
+      "id": "6cf6d466-3ca8-40e9-bfd5-c5d36b0edd34",
       "name": "Twilio Voice Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -32,13 +32,13 @@
         -460,
         300
       ],
-      "webhookId": "d8737af1-46a9-4e23-983b-87b490c0a6df"
+      "webhookId": "09539aed-3615-43fc-9516-0d040d1ec047"
     },
     {
       "parameters": {
-        "jsCode": "// ================= EDIT THESE SETTINGS =================\nconst config = {\n  businessName: 'Your HVAC Company',\n  timezone: 'America/New_York',\n  voice: 'Polly.Joanna-Neural',          // Twilio text-to-speech voice\n  language: 'en-US',\n  // Who the AI can transfer callers to. Every number in a list rings at once; first to answer gets the call.\n  departments: {\n    service: { label: 'service, repairs and scheduling', numbers: ['+15555550100'] },\n    sales:   { label: 'sales, quotes and new installations', numbers: ['+15555550101'] },\n    billing: { label: 'billing, invoices and payments', numbers: ['+15555550102'] },\n    manager: { label: 'a manager, for complaints or escalations', numbers: ['+15555550103'] },\n  },\n  defaultDepartment: 'service',\n  whisperToStaff: true,                  // staff hear who is calling and why before being connected\n  emergencyNumbers: ['+15555550199'],    // on-call emergency tech(s)\n  staffSmsNumber: '+15555550100',        // receives staff SMS alerts\n  sheetId: 'YOUR_GOOGLE_SHEET_ID',       // Google Sheets CRM file ID\n  callbackMinutes: 15,\n  smsEveryCallSummary: true,             // SMS staff a summary when the AI ends a call\n  speechHints: 'furnace, AC, air conditioner, heat pump, thermostat, carbon monoxide, gas leak, appointment, maintenance, tune-up, ductwork',\n};\n// =======================================================\n\nconst req = $input.first().json;\nconst body = req.body || {};\nconst query = req.query || {};\nconst speech = String(body.SpeechResult || '').trim();\n\n// Emergency check: runs on every caller sentence, before the AI.\nconst emergencyPatterns = [\n  { type: 'Gas leak', re: /\\b(gas (smell|leak)|smell(s|ing)? (of |like )?gas|rotten eggs?)\\b/i },\n  { type: 'Carbon monoxide', re: /\\b(carbon monoxide|monoxide|co (alarm|detector))\\b/i },\n  { type: 'Fire / smoke', re: /\\b(on fire|fire in|smoke|smoking|flames?|sparks?|sparking|burning smell|smells? (like )?burning)\\b/i },\n  { type: 'Electrical hazard', re: /\\b(exposed wires?|electrical (fire|burning)|got shocked|electrocut\\w*)\\b/i },\n  { type: 'Flooding', re: /\\b(flood(ing|ed)?|water everywhere|burst pipe)\\b/i },\n  { type: 'Emergency', re: /\\b(emergency|nine one one|911)\\b/i },\n];\nconst hit = speech ? emergencyPatterns.find((p) => p.re.test(speech)) : null;\n\nreturn [{\n  json: {\n    config,\n    stage: query.stage || 'incoming',\n    reason: query.reason || '',\n    callSid: body.CallSid || '',\n    from: body.From || '',\n    to: body.To || '',\n    speech,\n    confidence: Number(body.Confidence || 0),\n    callStatus: body.CallStatus || '',\n    duration: Number(body.CallDuration || 0),\n    dialStatus: body.DialCallStatus || '',\n    isEmergency: Boolean(hit),\n    emergencyType: hit ? hit.type : '',\n    timestamp: $now.setZone(config.timezone).toFormat('yyyy-LL-dd HH:mm:ss'),\n  },\n}];"
+        "jsCode": "// ================= EDIT THESE SETTINGS =================\nconst config = {\n  businessName: 'Your HVAC Company',\n  timezone: 'America/New_York',\n  voice: 'Polly.Joanna-Neural',          // Twilio text-to-speech voice\n  language: 'en-US',\n  // Who the AI can transfer callers to. Every number in a list rings at once; first to answer gets the call.\n  departments: {\n    service: { label: 'service, repairs and scheduling', numbers: ['+15555550100'] },\n    sales:   { label: 'sales, quotes and new installations', numbers: ['+15555550101'] },\n    billing: { label: 'billing, invoices and payments', numbers: ['+15555550102'] },\n    manager: { label: 'a manager, for complaints or escalations', numbers: ['+15555550103'] },\n  },\n  defaultDepartment: 'service',\n  whisperToStaff: true,                  // staff hear who is calling and why before being connected\n  emergencyNumbers: ['+15555550199'],    // on-call emergency tech(s)\n  sheetId: 'YOUR_GOOGLE_SHEET_ID',       // Google Sheets CRM file ID\n  callbackMinutes: 15,\n  speechHints: 'furnace, AC, air conditioner, heat pump, thermostat, carbon monoxide, gas leak, appointment, maintenance, tune-up, ductwork',\n};\n// =======================================================\n\nconst req = $input.first().json;\nconst body = req.body || {};\nconst query = req.query || {};\nconst speech = String(body.SpeechResult || '').trim();\n\n// Emergency check: runs on every caller sentence, before the AI.\nconst emergencyPatterns = [\n  { type: 'Gas leak', re: /\\b(gas (smell|leak)|smell(s|ing)? (of |like )?gas|rotten eggs?)\\b/i },\n  { type: 'Carbon monoxide', re: /\\b(carbon monoxide|monoxide|co (alarm|detector))\\b/i },\n  { type: 'Fire / smoke', re: /\\b(on fire|fire in|smoke|smoking|flames?|sparks?|sparking|burning smell|smells? (like )?burning)\\b/i },\n  { type: 'Electrical hazard', re: /\\b(exposed wires?|electrical (fire|burning)|got shocked|electrocut\\w*)\\b/i },\n  { type: 'Flooding', re: /\\b(flood(ing|ed)?|water everywhere|burst pipe)\\b/i },\n  { type: 'Emergency', re: /\\b(emergency|nine one one|911)\\b/i },\n];\nconst hit = speech ? emergencyPatterns.find((p) => p.re.test(speech)) : null;\n\nreturn [{\n  json: {\n    config,\n    stage: query.stage || 'incoming',\n    reason: query.reason || '',\n    callSid: body.CallSid || '',\n    from: body.From || '',\n    to: body.To || '',\n    speech,\n    confidence: Number(body.Confidence || 0),\n    callStatus: body.CallStatus || '',\n    duration: Number(body.CallDuration || 0),\n    dialStatus: body.DialCallStatus || '',\n    isEmergency: Boolean(hit),\n    emergencyType: hit ? hit.type : '',\n    timestamp: $now.setZone(config.timezone).toFormat('yyyy-LL-dd HH:mm:ss'),\n  },\n}];"
       },
-      "id": "ce13208a-b60d-40af-a723-ec5aa872e4b0",
+      "id": "fb98c60c-1fc7-4ab6-91f4-5fdc3dc0e2bc",
       "name": "Config & Parse Call",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -61,7 +61,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "9be06b60-efc4-49b6-8c80-69bc0dfe7f8c",
+                    "id": "b43ff679-29f1-40c1-a7a2-eeae43fd86e8",
                     "leftValue": "={{ $json.stage }}",
                     "rightValue": "incoming",
                     "operator": {
@@ -85,7 +85,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "0f96e190-2b48-4972-985c-b064d8743843",
+                    "id": "96d4e87c-f5d7-4885-a1a8-1a24503fd7f5",
                     "leftValue": "={{ $json.stage }}",
                     "rightValue": "turn",
                     "operator": {
@@ -109,7 +109,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "25ea6c86-9d88-460d-8828-3111f6adfab8",
+                    "id": "8073f4ef-08a5-4c7c-b3ee-afbcd973cd13",
                     "leftValue": "={{ $json.stage }}",
                     "rightValue": "dial",
                     "operator": {
@@ -133,7 +133,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "df5fd055-cf0d-4f48-9323-ae5f02558f6f",
+                    "id": "82371f2a-4403-46ef-a94d-4e14b484f38e",
                     "leftValue": "={{ $json.stage }}",
                     "rightValue": "status",
                     "operator": {
@@ -157,7 +157,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "dbde3f0e-106f-4cb8-94ed-576ad4eca773",
+                    "id": "a5835dba-2fbf-4329-bd49-768f83ec9d09",
                     "leftValue": "={{ $json.stage }}",
                     "rightValue": "whisper",
                     "operator": {
@@ -175,7 +175,7 @@
         },
         "options": {}
       },
-      "id": "57c8fea3-32cc-4986-91cf-cef3299de0c0",
+      "id": "8fb628f1-cb31-475b-809b-ae63377b333e",
       "name": "Route by Call Stage",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
@@ -191,8 +191,8 @@
         "width": 640,
         "color": 7
       },
-      "id": "4e4d5446-3e03-4fce-95e6-cc6922a2d426",
-      "name": "Note c178af",
+      "id": "717697d9-c3b3-426e-8a35-61c8ef3b6098",
+      "name": "Note 87df60",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -204,7 +204,7 @@
       "parameters": {
         "jsCode": "const call = $input.first().json;\nconst c = call.config;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\nconst greeting = `Thanks for calling ${c.businessName}. I'm the virtual assistant. ` +\n  `If you smell gas, have a carbon monoxide alarm going off, or see smoke, say emergency right away. ` +\n  `Otherwise, how can I help you today?`;\n\nreturn [{\n  json: {\n    ...call,\n    twiml: twiml(\n      gather(greeting) +\n      gather(\"Sorry, I didn't catch that. How can I help you today?\") +\n      say(`I didn't hear anything, so I'll end the call. Please call ${c.businessName} back anytime. Goodbye.`) +\n      '<Hangup/>'\n    ),\n  },\n}];"
       },
-      "id": "0ca925ea-9c90-4caf-a77b-5a03160c7fb2",
+      "id": "7985249a-c6e8-473e-af9f-bdafb7485b3b",
       "name": "Greeting TwiML",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -228,7 +228,7 @@
           }
         }
       },
-      "id": "949584d7-e138-48b9-8aff-e2e109c85b3b",
+      "id": "d91a811f-4bea-45b8-9299-dedd9d0f1c77",
       "name": "Answer Call",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -326,7 +326,7 @@
           "cellFormat": "RAW"
         }
       },
-      "id": "30c5d075-1271-47bf-8551-321824efb2d6",
+      "id": "b025bbeb-2567-4128-b8dd-7d46d8ca463e",
       "name": "CRM: New Call",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -349,8 +349,8 @@
         "width": 1700,
         "color": 6
       },
-      "id": "c0ac52fe-a17e-4209-95c4-43113f8a2226",
-      "name": "Note f84ed0",
+      "id": "e81ebafb-90c4-4d6a-b674-b920cca8cf10",
+      "name": "Note 020d77",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -369,7 +369,7 @@
           },
           "conditions": [
             {
-              "id": "c304d9a1-4484-45b5-a2ed-13494aa55f68",
+              "id": "d10a6da5-c348-41d8-93ae-d297bdae5189",
               "leftValue": "={{ $json.isEmergency }}",
               "rightValue": "",
               "operator": {
@@ -383,7 +383,7 @@
         },
         "options": {}
       },
-      "id": "ee17ed2f-e3bf-44b0-b4fd-1241b758c7c6",
+      "id": "ad63fb2c-4667-48d2-befa-e94c81be8799",
       "name": "Emergency Check",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -396,7 +396,7 @@
       "parameters": {
         "jsCode": "const call = $input.first().json;\nreturn [{\n  json: {\n    ...call,\n    decision: {\n      action: 'emergency',\n      reply: '',\n      intent: 'emergency',\n      customer_name: '',\n      summary: `Emergency detected (${call.emergencyType}). Caller said: \"${call.speech}\"`,\n      callback_needed: true,\n    },\n  },\n}];"
       },
-      "id": "454ca981-b58d-4355-bccb-7af90e244989",
+      "id": "dbac074d-3b8f-433b-8ea0-1c6e2a716ac0",
       "name": "Emergency Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -415,7 +415,7 @@
           "maxIterations": 6
         }
       },
-      "id": "b13e56b4-0ebb-4107-b55e-e5a24e5b9a96",
+      "id": "33a596cb-1585-45f8-82ea-177648927118",
       "name": "AI Receptionist",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.7,
@@ -437,7 +437,7 @@
           "temperature": 0.3
         }
       },
-      "id": "85d87475-5139-429d-b3ca-7a98c8ac22f1",
+      "id": "48dc7f07-2eb0-4051-ad55-0553b2abc831",
       "name": "Claude Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
@@ -458,7 +458,7 @@
         "sessionKey": "={{ $('Config & Parse Call').first().json.callSid }}",
         "contextWindowLength": 20
       },
-      "id": "407b0875-43ce-40f6-921f-f9ac6e3511da",
+      "id": "88555fa1-de25-4abd-9d1e-f39550c40f32",
       "name": "Call Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.3,
@@ -496,7 +496,7 @@
           "convertFieldsToString": false
         }
       },
-      "id": "e70aedf4-dd0a-48d0-8d6d-2591f5c05c0b",
+      "id": "7baeba90-303b-4404-a63e-6ad175191745",
       "name": "HVAC_Knowledge_Base",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
@@ -604,7 +604,7 @@
           "convertFieldsToString": false
         }
       },
-      "id": "ba4d6516-77ab-46e9-8de5-464bb7aa5493",
+      "id": "d09c4c7a-002b-48d8-967f-98e8e76168f2",
       "name": "Book_Appointment",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
@@ -617,7 +617,7 @@
       "parameters": {
         "jsonSchemaExample": "{\n  \"action\": \"continue\",\n  \"reply\": \"Sure, I can get a technician out to look at your AC. Can I get your full name?\",\n  \"intent\": \"booking\",\n  \"customer_name\": \"\",\n  \"summary\": \"Caller's AC is blowing warm air and they want a repair visit.\",\n  \"callback_needed\": false,\n  \"transfer_to\": \"\"\n}"
       },
-      "id": "e0f72f4e-1d6f-47e7-8760-5a3cfb8eacaa",
+      "id": "933b76e6-9174-4896-8538-7882ff5fb9de",
       "name": "AI Reply Format",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.2,
@@ -630,7 +630,7 @@
       "parameters": {
         "jsCode": "const call = $('Config & Parse Call').first().json;\nconst raw = $input.first().json;\nlet out = raw.output;\n\nif (typeof out === 'string') {\n  try {\n    out = JSON.parse(out.replace(/```(json)?/g, '').trim());\n  } catch (e) {\n    out = { action: 'continue', reply: out };\n  }\n}\n\n// AI failed or timed out: never leave the caller in silence, hand them to a person.\nif (!out || typeof out !== 'object' || raw.error) {\n  out = {\n    action: 'transfer',\n    reply: \"I'm sorry, I'm having a little trouble on my end. Let me connect you with someone from our team.\",\n    intent: 'system_error',\n    summary: 'AI error: ' + (raw.error?.message || raw.error || 'no output'),\n    callback_needed: true,\n  };\n}\n\nconst allowed = ['continue', 'transfer', 'end', 'emergency'];\nlet action = String(out.action || 'continue').toLowerCase().trim();\nif (!allowed.includes(action)) action = 'continue';\n\nconst decision = {\n  action,\n  reply: String(out.reply || '').trim(),\n  intent: String(out.intent || 'other'),\n  customer_name: String(out.customer_name || ''),\n  summary: String(out.summary || ''),\n  callback_needed: out.callback_needed === true || out.callback_needed === 'true',\n  transfer_to: String(out.transfer_to || '').toLowerCase().trim(),\n};\nif (action === 'continue' && !decision.reply) decision.reply = 'Sorry, could you say that one more time?';\n\nreturn [{ json: { ...call, decision } }];"
       },
-      "id": "17ea1635-e62f-4118-ab01-d197bfd2483f",
+      "id": "ca07f0ad-fbc9-40c2-a338-1f8bac405f90",
       "name": "Parse AI Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -641,9 +641,9 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst c = item.config;\nconst d = item.decision;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\n// Staff phone hears a short \"whisper\" (hvac-voice?stage=whisper) before the caller is connected.\nconst numbers = (list, whisper) => list.map((n) => {\n  const url = c.whisperToStaff && whisper\n    ? ` url=\"${esc('hvac-voice?stage=whisper&msg=' + encodeURIComponent(whisper.slice(0, 300)))}\" method=\"POST\"`\n    : '';\n  return `<Number${url}>${esc(n)}</Number>`;\n}).join('');\nconst deptKey = c.departments[d.transfer_to] ? d.transfer_to : c.defaultDepartment;\nconst dept = c.departments[deptKey];\nconst who = d.customer_name ? `${d.customer_name} (${item.from})` : item.from;\nconst spokenWho = d.customer_name || 'a customer';\n\nconst SAFETY =\n  'For your safety: if you smell gas, leave the building now. Do not use light switches, ' +\n  'appliances, or open flames, and call 911 or your gas company once you are outside. ' +\n  'If a carbon monoxide alarm is sounding, get everyone into fresh air and call 911.';\n\nlet inner = '';\nlet outcome = 'In conversation';\nswitch (d.action) {\n  case 'emergency':\n    inner = say(SAFETY) +\n      say('I am connecting you to our emergency technician now. Please stay on the line.') +\n      `<Dial timeout=\"30\" action=\"hvac-voice?stage=dial&amp;reason=emergency\" method=\"POST\">${numbers(c.emergencyNumbers, `Emergency call from ${spokenWho}. ${item.emergencyType || ''}. Caller said: ${item.speech}`)}</Dial>`;\n    outcome = 'EMERGENCY - transferred to on-call';\n    break;\n  case 'transfer':\n    inner = say(d.reply || 'Let me connect you with a member of our team. One moment please.') +\n      `<Dial timeout=\"25\" action=\"hvac-voice?stage=dial&amp;reason=${esc(deptKey)}\" method=\"POST\">` +\n      `${numbers(dept.numbers, `AI receptionist transfer for ${deptKey}. Caller ${spokenWho}. ${d.summary}`)}</Dial>`;\n    outcome = `Transferred to ${deptKey}`;\n    break;\n  case 'end':\n    inner = say(d.reply || `Thanks for calling ${c.businessName}. Have a great day. Goodbye.`) + '<Hangup/>';\n    outcome = 'Completed by AI';\n    break;\n  default:\n    inner = gather(d.reply) +\n      gather('Are you still there? How else can I help?') +\n      say(`I didn't hear anything, so I'll end the call. Please call ${c.businessName} back anytime. Goodbye.`) +\n      '<Hangup/>';\n}\n\n// Staff SMS text\nlet notifyStaff = false;\nlet smsText = '';\nif (d.action === 'emergency') {\n  notifyStaff = true;\n  smsText = `EMERGENCY call from ${who}. Type: ${item.emergencyType || 'reported by caller'}. ` +\n    `Caller said: \"${item.speech}\". Connecting to on-call now.`;\n} else if (d.action === 'transfer') {\n  notifyStaff = true;\n  smsText = `Transfer to ${deptKey}: ${who} is being connected now. ${d.summary}`;\n} else if (d.action === 'end' && (c.smsEveryCallSummary || d.callback_needed)) {\n  notifyStaff = true;\n  smsText = `Call finished: ${who}. ${d.summary}` + (d.callback_needed ? ' CALLBACK NEEDED.' : '');\n}\n\nreturn [{\n  json: {\n    ...item,\n    twiml: twiml(inner),\n    outcome,\n    notifyStaff,\n    smsText: smsText.slice(0, 600),\n  },\n}];"
+        "jsCode": "const item = $input.first().json;\nconst c = item.config;\nconst d = item.decision;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\n// Staff phone hears a short \"whisper\" (hvac-voice?stage=whisper) before the caller is connected.\nconst numbers = (list, whisper) => list.map((n) => {\n  const url = c.whisperToStaff && whisper\n    ? ` url=\"${esc('hvac-voice?stage=whisper&msg=' + encodeURIComponent(whisper.slice(0, 300)))}\" method=\"POST\"`\n    : '';\n  return `<Number${url}>${esc(n)}</Number>`;\n}).join('');\nconst deptKey = c.departments[d.transfer_to] ? d.transfer_to : c.defaultDepartment;\nconst dept = c.departments[deptKey];\nconst spokenWho = d.customer_name || 'a customer';\n\nconst SAFETY =\n  'For your safety: if you smell gas, leave the building now. Do not use light switches, ' +\n  'appliances, or open flames, and call 911 or your gas company once you are outside. ' +\n  'If a carbon monoxide alarm is sounding, get everyone into fresh air and call 911.';\n\nlet inner = '';\nlet outcome = 'In conversation';\nswitch (d.action) {\n  case 'emergency':\n    inner = say(SAFETY) +\n      say('I am connecting you to our emergency technician now. Please stay on the line.') +\n      `<Dial timeout=\"30\" action=\"hvac-voice?stage=dial&amp;reason=emergency\" method=\"POST\">${numbers(c.emergencyNumbers, `Emergency call from ${spokenWho}. ${item.emergencyType || ''}. Caller said: ${item.speech}`)}</Dial>`;\n    outcome = 'EMERGENCY - transferred to on-call';\n    break;\n  case 'transfer':\n    inner = say(d.reply || 'Let me connect you with a member of our team. One moment please.') +\n      `<Dial timeout=\"25\" action=\"hvac-voice?stage=dial&amp;reason=${esc(deptKey)}\" method=\"POST\">` +\n      `${numbers(dept.numbers, `AI receptionist transfer for ${deptKey}. Caller ${spokenWho}. ${d.summary}`)}</Dial>`;\n    outcome = `Transferred to ${deptKey}`;\n    break;\n  case 'end':\n    inner = say(d.reply || `Thanks for calling ${c.businessName}. Have a great day. Goodbye.`) + '<Hangup/>';\n    outcome = 'Completed by AI';\n    break;\n  default:\n    inner = gather(d.reply) +\n      gather('Are you still there? How else can I help?') +\n      say(`I didn't hear anything, so I'll end the call. Please call ${c.businessName} back anytime. Goodbye.`) +\n      '<Hangup/>';\n}\n\nreturn [{\n  json: {\n    ...item,\n    twiml: twiml(inner),\n    outcome,\n  },\n}];"
       },
-      "id": "6c885aba-d386-4946-859f-60a2a395d6aa",
+      "id": "f83b7fd2-875b-46ad-8c7d-d2cc513ff7c6",
       "name": "Build TwiML Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -667,7 +667,7 @@
           }
         }
       },
-      "id": "3d753f6c-a35b-43a3-a601-de5e7c466d70",
+      "id": "547f3bfa-b956-4f3b-9cf9-199788d6ea62",
       "name": "Speak to Caller",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -773,7 +773,7 @@
           "cellFormat": "RAW"
         }
       },
-      "id": "c7ce8e1d-a40c-40d4-b58e-3bd209d9f754",
+      "id": "eb565869-e553-4ff4-b1a2-688243bac150",
       "name": "CRM: Log Turn",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -948,7 +948,7 @@
           "cellFormat": "RAW"
         }
       },
-      "id": "f856ee64-7ad8-4c20-8c2a-358fe3c4083d",
+      "id": "c46d99fb-d446-4745-b3a4-38416cde046b",
       "name": "CRM: Update Call",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -966,71 +966,13 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "0e5de63b-dd72-4d0d-aa0b-f284574ecd47",
-              "leftValue": "={{ $json.notifyStaff }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "468a9829-73f0-4032-9dd9-c1079ad5f7de",
-      "name": "Notify Staff?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1560,
-        580
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "send",
-        "from": "={{ $json.to }}",
-        "to": "={{ $json.config.staffSmsNumber }}",
-        "message": "={{ $json.smsText }}",
-        "options": {}
-      },
-      "id": "242db475-7ed6-486f-9510-8ecd5bee3f37",
-      "name": "Staff SMS Alert",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
-      "position": [
-        1780,
-        560
-      ],
-      "credentials": {
-        "twilioApi": {
-          "id": "",
-          "name": "Twilio account"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "content": "### 3. After a transfer\nIf nobody answered: tell caller we'll call back, SMS staff, flag CRM.",
+        "content": "### 3. After a transfer\nIf nobody answered: tell caller we'll call back and flag the CRM row.",
         "height": 120,
         "width": 1100,
         "color": 3
       },
-      "id": "8bf5ad50-dc3b-4ebf-b875-551c4d186150",
-      "name": "Note a18204",
+      "id": "3952182c-15f6-47ff-906d-b546509fd548",
+      "name": "Note d19e12",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -1040,9 +982,9 @@
     },
     {
       "parameters": {
-        "jsCode": "const call = $input.first().json;\nconst c = call.config;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\nconst answered = call.dialStatus === 'completed' || call.dialStatus === 'answered';\nconst isEmergency = call.reason === 'emergency';\n\nlet inner;\nif (answered) {\n  inner = '<Hangup/>';\n} else if (isEmergency) {\n  inner = say(\n    `I couldn't reach our on-call technician, but they have been alerted and will call you back within ${c.callbackMinutes} minutes. ` +\n    'If anyone is in danger, hang up and call 911 now. Goodbye.') + '<Hangup/>';\n} else {\n  inner = say(\n    `Sorry, our team couldn't pick up right now. I've sent them your number and someone will call you back within ${c.callbackMinutes} minutes. ` +\n    `Thanks for calling ${c.businessName}. Goodbye.`) + '<Hangup/>';\n}\n\nreturn [{\n  json: {\n    ...call,\n    twiml: twiml(inner),\n    missed: !answered,\n    smsText: `MISSED ${isEmergency ? 'EMERGENCY ' : ''}transfer from ${call.from} (status: ${call.dialStatus || 'unknown'}). ` +\n      `Please call back within ${c.callbackMinutes} minutes.`,\n  },\n}];"
+        "jsCode": "const call = $input.first().json;\nconst c = call.config;\nconst esc = (s) => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&apos;');\nconst say = (t) => `<Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(t)}</Say>`;\n// Relative URLs are resolved by Twilio against this webhook's URL.\nconst gather = (prompt) =>\n  `<Gather input=\"speech\" action=\"hvac-voice?stage=turn\" method=\"POST\" speechTimeout=\"auto\" ` +\n  `speechModel=\"phone_call\" language=\"${c.language}\" hints=\"${esc(c.speechHints)}\">${say(prompt)}</Gather>`;\nconst twiml = (inner) => `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response>${inner}</Response>`;\nconst answered = call.dialStatus === 'completed' || call.dialStatus === 'answered';\nconst isEmergency = call.reason === 'emergency';\n\nlet inner;\nif (answered) {\n  inner = '<Hangup/>';\n} else if (isEmergency) {\n  inner = say(\n    `I couldn't reach our on-call technician, but they will see your missed call and call you back within ${c.callbackMinutes} minutes. ` +\n    'If anyone is in danger, hang up and call 911 now. Goodbye.') + '<Hangup/>';\n} else {\n  inner = say(\n    `Sorry, our team couldn't pick up right now. I've passed your number to the team and someone will call you back within ${c.callbackMinutes} minutes. ` +\n    `Thanks for calling ${c.businessName}. Goodbye.`) + '<Hangup/>';\n}\n\nreturn [{\n  json: {\n    ...call,\n    twiml: twiml(inner),\n    missed: !answered,\n  },\n}];"
       },
-      "id": "2bc26115-6594-4980-b95c-0a6a584e8e7e",
+      "id": "66644672-db3b-4108-9b52-c79c22f0e687",
       "name": "Transfer Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1066,7 +1008,7 @@
           }
         }
       },
-      "id": "812a5a8c-d1c0-41da-9eb3-681766cf4baf",
+      "id": "d532bb01-3171-4d23-af10-03887955317e",
       "name": "Finish Transfer",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -1086,7 +1028,7 @@
           },
           "conditions": [
             {
-              "id": "7587fb59-f7a2-4fc0-9880-f3a80d2941b1",
+              "id": "5345d94d-b675-4504-878a-0bbf074c6903",
               "leftValue": "={{ $json.missed }}",
               "rightValue": "",
               "operator": {
@@ -1100,7 +1042,7 @@
         },
         "options": {}
       },
-      "id": "c4ecde55-f0da-4f5e-8e00-ffdd724f127b",
+      "id": "ef07ec4f-6e82-4221-b71a-cd9cca026ac4",
       "name": "Nobody Answered?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -1108,30 +1050,6 @@
         700,
         1120
       ]
-    },
-    {
-      "parameters": {
-        "operation": "send",
-        "from": "={{ $json.to }}",
-        "to": "={{ $json.config.staffSmsNumber }}",
-        "message": "={{ $json.smsText }}",
-        "options": {}
-      },
-      "id": "3b81438f-4fc4-40db-aed9-b77bf574411d",
-      "name": "Missed Transfer SMS",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
-      "position": [
-        920,
-        1040
-      ],
-      "credentials": {
-        "twilioApi": {
-          "id": "",
-          "name": "Twilio account"
-        }
-      },
-      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1202,7 +1120,7 @@
           "cellFormat": "RAW"
         }
       },
-      "id": "2d9ef125-cef5-4c40-9037-d1fcf0fb28ca",
+      "id": "10b8f3ed-fa1c-4dd0-8afe-0eeeb555fa7d",
       "name": "CRM: Callback Needed",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -1225,8 +1143,8 @@
         "width": 700,
         "color": 5
       },
-      "id": "8b0d4009-7f01-4f7d-9068-8d7ee315db33",
-      "name": "Note 8d4c09",
+      "id": "767152c9-c7e9-43a3-81fc-57028bd57b0c",
+      "name": "Note c05204",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -1249,7 +1167,7 @@
           }
         }
       },
-      "id": "06c2d134-a380-47d3-a12a-ef3487b6d155",
+      "id": "4d63ec87-18f5-495f-b70a-59816f7c8ba3",
       "name": "Acknowledge Status",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -1337,7 +1255,7 @@
           "cellFormat": "RAW"
         }
       },
-      "id": "ff3fb6ca-2db3-4f92-87a8-eed96d2eaa72",
+      "id": "d2f6b404-1b0a-4aed-b97d-6dd2d779b8e0",
       "name": "CRM: Call Ended",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -1360,8 +1278,8 @@
         "width": 520,
         "color": 5
       },
-      "id": "6b2d3548-090c-4152-8eb2-4264b98792dd",
-      "name": "Note ae5be0",
+      "id": "824c9bf8-a2f7-455c-a7bf-78a8a57de2e7",
+      "name": "Note c18ba9",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -1373,7 +1291,7 @@
       "parameters": {
         "jsCode": "const call = $input.first().json;\nconst c = call.config;\nconst msg = String($('Twilio Voice Webhook').first().json.query?.msg || 'Incoming transfer from the AI receptionist.');\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nreturn [{ json: { twiml: `<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Say voice=\"${c.voice}\" language=\"${c.language}\">${esc(msg)}. Connecting you now.</Say></Response>` } }];"
       },
-      "id": "5a599b89-2b16-42ce-90cb-3d9b2d1bbec3",
+      "id": "986dd7c2-d077-425a-9385-5d07159595d3",
       "name": "Whisper TwiML",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1397,7 +1315,7 @@
           }
         }
       },
-      "id": "c71e7169-e6ff-4056-b190-f61b0042c104",
+      "id": "d2921608-af3c-47ef-809a-5c60a867aa25",
       "name": "Whisper to Staff",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -1620,22 +1538,6 @@
             "node": "CRM: Update Call",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Notify Staff?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Notify Staff?": {
-      "main": [
-        [
-          {
-            "node": "Staff SMS Alert",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -1665,11 +1567,6 @@
     "Nobody Answered?": {
       "main": [
         [
-          {
-            "node": "Missed Transfer SMS",
-            "type": "main",
-            "index": 0
-          },
           {
             "node": "CRM: Callback Needed",
             "type": "main",
